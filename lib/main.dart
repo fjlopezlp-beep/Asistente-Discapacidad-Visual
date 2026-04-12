@@ -138,26 +138,13 @@ class _CameraScreenState extends State<CameraScreen> {
                 ],
               ),
             ),
-            /*           const Align(
-              alignment: Alignment(0, 0.85),
-              child: Text(
-                "002 TOCA LA PANTALLA y CAPTURA",
-                style: TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.bold,
-                  backgroundColor: Colors.black54,
-                ),
-              ),
-            ),
-*/
-            // esto es una prueba para dos lineas de texto
             const Align(
               alignment: Alignment(0, 0.85),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Text(
-                    "002 TOCA LA PANTALLA Y CAPTURA",
+                    "TOCA LA PANTALLA Y CAPTURA",
                     style: TextStyle(
                       fontSize: 20,
                       fontWeight: FontWeight.bold,
@@ -168,7 +155,7 @@ class _CameraScreenState extends State<CameraScreen> {
                   const Text(
                     "TFM: ASISTENTE PARA PERSONAS CON DISCAPACIDAD VISUAL",
                     style: TextStyle(
-                      fontSize: 8,
+                      fontSize: 10,
                       fontWeight: FontWeight.bold,
                       backgroundColor: Colors.black54,
                       color: Colors.white70,
