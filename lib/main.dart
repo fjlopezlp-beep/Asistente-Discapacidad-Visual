@@ -1,8 +1,9 @@
 // TFM: Asistente para personas con discapacidad visual
 // Fco Javier López López
-// Versión: Versión Alpha - Funcionalidad de captura y previsualización
+// Versión PRO: Corrección híbrida (Levenshtein + Fonética + Contexto)
 
 import 'dart:io';
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:camera/camera.dart';
@@ -33,13 +34,13 @@ class CameraScreen extends StatefulWidget {
 
 class _CameraScreenState extends State<CameraScreen> {
   late CameraController _controller;
-  late Future<void> _initializeControllerFuture;
+  late Future<void> _init;
 
   @override
   void initState() {
     super.initState();
     _controller = CameraController(widget.camera, ResolutionPreset.high);
-    _initializeControllerFuture = _controller.initialize();
+    _init = _controller.initialize();
   }
 
   @override
@@ -48,68 +49,73 @@ class _CameraScreenState extends State<CameraScreen> {
     super.dispose();
   }
 
-  Future<void> _capturarYProcesar() async {
-    try {
-      SystemSound.play(SystemSoundType.click);
-      HapticFeedback.heavyImpact();
+  Future<void> _capturar() async {
+    await _init;
+    final foto = await _controller.takePicture();
 
-      await _initializeControllerFuture;
-      final XFile rawImage = await _controller.takePicture();
+    final bytes = await File(foto.path).readAsBytes();
+    img.Image? image = img.decodeImage(bytes);
 
-      final bytes = await File(rawImage.path).readAsBytes();
-      img.Image? image = img.decodeImage(bytes);
+    if (image != null) {
+      img.Image cropped = img.copyCrop(
+        image,
+        x: 0,
+        y: 0,
+        width: image.width,
+        height: (image.height * 2 / 3).toInt(),
+      );
 
-      if (image != null) {
-        // --- MODIFICACIÓN: RECORTE DESDE ARRIBA ---
-        int cropW = image.width;
-        int cropH = (image.height * (2 / 3)).toInt();
-        int offsetX = 0;
-        int offsetY = 0; // Cambiado de (height-cropH)/2 a 0 para empezar arriba
+      final dir = await getTemporaryDirectory();
+      final path =
+          '${dir.path}/ocr_${DateTime.now().millisecondsSinceEpoch}.png';
 
-        img.Image cropped = img.copyCrop(
-          image,
-          x: offsetX,
-          y: offsetY,
-          width: cropW,
-          height: cropH,
-        );
+      File(path).writeAsBytesSync(img.encodePng(cropped));
 
-        final dir = await getTemporaryDirectory();
-        final String fileName =
-            'ocr_${DateTime.now().millisecondsSinceEpoch}.png';
-        final path = '${dir.path}/$fileName';
-
-        File(path).writeAsBytesSync(img.encodePng(cropped));
-
-        if (!mounted) return;
-        Navigator.of(context).push(
-          MaterialPageRoute(
-            builder: (context) => ResultScreen(imagePath: path),
-          ),
-        );
-      }
-    } catch (e) {
-      debugPrint("Error: $e");
+      if (!mounted) return;
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => ResultScreen(imagePath: path)),
+      );
     }
   }
+
+  /*  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      body: GestureDetector(
+        onTap: _capturar,
+        child: FutureBuilder(
+          future: _init,
+          builder: (_, snap) {
+            return snap.connectionState == ConnectionState.done
+                ? CameraPreview(_controller)
+                : const Center(child: CircularProgressIndicator());
+          },
+        ),
+      ),
+    );
+  }*/
 
   @override
   Widget build(BuildContext context) {
     final size = MediaQuery.of(context).size;
+
     return Scaffold(
       body: GestureDetector(
-        onTap: _capturarYProcesar,
+        onTap: _capturar,
         child: Stack(
           children: [
-            FutureBuilder<void>(
-              future: _initializeControllerFuture,
-              builder: (context, snapshot) {
-                return snapshot.connectionState == ConnectionState.done
+            // Cámara
+            FutureBuilder(
+              future: _init,
+              builder: (_, snap) {
+                return snap.connectionState == ConnectionState.done
                     ? SizedBox.expand(child: CameraPreview(_controller))
                     : const Center(child: CircularProgressIndicator());
               },
             ),
-            // --- MODIFICACIÓN: MÁSCARA ALINEADA AL TOP ---
+
+            // MÁSCARA OSCURA
             ColorFiltered(
               colorFilter: const ColorFilter.mode(
                 Colors.black54,
@@ -123,9 +129,10 @@ class _CameraScreenState extends State<CameraScreen> {
                       backgroundBlendMode: BlendMode.dstOut,
                     ),
                   ),
+
+                  // ZONA VISIBLE (OCR)
                   Align(
-                    alignment:
-                        Alignment.topCenter, // Cambiado de center a topCenter
+                    alignment: Alignment.topCenter,
                     child: Container(
                       width: size.width,
                       height: size.height * (2 / 3),
@@ -138,6 +145,7 @@ class _CameraScreenState extends State<CameraScreen> {
                 ],
               ),
             ),
+            // esto es una prueba para dos lineas de texto
             const Align(
               alignment: Alignment(0, 0.85),
               child: Column(
@@ -155,7 +163,7 @@ class _CameraScreenState extends State<CameraScreen> {
                   const Text(
                     "TFM: ASISTENTE PARA PERSONAS CON DISCAPACIDAD VISUAL",
                     style: TextStyle(
-                      fontSize: 10,
+                      fontSize: 12,
                       fontWeight: FontWeight.bold,
                       backgroundColor: Colors.black54,
                       color: Colors.white70,
@@ -170,11 +178,14 @@ class _CameraScreenState extends State<CameraScreen> {
     );
   }
 }
+// ================= LINEAS DE TEXTO INFORMATIVAS =================
 
-// --- CLASE RESULTADO (Se mantiene igual que la anterior) ---
+// ================= RESULTADO =================
+
 class ResultScreen extends StatefulWidget {
   final String imagePath;
   const ResultScreen({super.key, required this.imagePath});
+
   @override
   State<ResultScreen> createState() => _ResultScreenState();
 }
@@ -183,99 +194,167 @@ class _ResultScreenState extends State<ResultScreen> {
   final FlutterTts _tts = FlutterTts();
   String _resultado = "Analizando...";
 
-  // ================= NORMALIZAR TEXTO =================
-  String normalizar(String texto) {
-    return texto
-        .toLowerCase()
-        .replaceAll(RegExp(r'[áàä]'), 'a')
-        .replaceAll(RegExp(r'[éèë]'), 'e')
-        .replaceAll(RegExp(r'[íìï]'), 'i')
-        .replaceAll(RegExp(r'[óòö]'), 'o')
-        .replaceAll(RegExp(r'[úùü]'), 'u');
+  List<String> diccionario = [];
+
+  final Set<String> palabrasClave = {
+    "arroz",
+    "pollo",
+    "lactosa",
+    "gluten",
+    "trigo",
+    "leche",
+    "cebada",
+    "centeno",
+    "huevo",
+    "soja",
+    "pescado",
+    "marisco",
+  };
+
+  // ================= NORMALIZAR =================
+  String normalizar(String t) => t
+      .toLowerCase()
+      .replaceAll(RegExp(r'[áàä]'), 'a')
+      .replaceAll(RegExp(r'[éèë]'), 'e')
+      .replaceAll(RegExp(r'[íìï]'), 'i')
+      .replaceAll(RegExp(r'[óòö]'), 'o')
+      .replaceAll(RegExp(r'[úùü]'), 'u');
+
+  // ================= FONÉTICA =================
+  String fonetizar(String palabra) {
+    return normalizar(palabra)
+        .replaceAll(RegExp(r'[bv]'), 'b')
+        .replaceAll(RegExp(r'[ckq]'), 'k')
+        .replaceAll('z', 's')
+        .replaceAll('ll', 'y')
+        .replaceAll('h', '')
+        .replaceAll(RegExp(r'[^a-z]'), '');
   }
 
-  // ================= BASE DE ALÉRGENOS =================
+  // ================= LIMPIEZA OCR =================
+  String limpiar(String p) =>
+      p.toLowerCase().replaceAll(RegExp(r'[^a-záéíóúüñ]'), '');
+
+  // ================= LEVENSHTEIN =================
+  int dist(String a, String b) {
+    final dp = List.generate(a.length + 1, (_) => List.filled(b.length + 1, 0));
+
+    for (int i = 0; i <= a.length; i++) dp[i][0] = i;
+    for (int j = 0; j <= b.length; j++) dp[0][j] = j;
+
+    for (int i = 1; i <= a.length; i++) {
+      for (int j = 1; j <= b.length; j++) {
+        int cost = a[i - 1] == b[j - 1] ? 0 : 1;
+        dp[i][j] = [
+          dp[i - 1][j] + 1,
+          dp[i][j - 1] + 1,
+          dp[i - 1][j - 1] + cost,
+        ].reduce((x, y) => x < y ? x : y);
+      }
+    }
+    return dp[a.length][b.length];
+  }
+
+  // ================= CORRECCIÓN PRO =================
+  String corregirPalabra(String palabra) {
+    String limpia = limpiar(palabra);
+    if (limpia.isEmpty) return palabra;
+
+    String norm = normalizar(limpia);
+    String fon = fonetizar(limpia);
+
+    String mejor = palabra;
+    int mejorScore = 999;
+
+    List<String> candidatos = [...palabrasClave, ...diccionario];
+
+    for (var d in candidatos) {
+      String dNorm = normalizar(d);
+      String dFon = fonetizar(d);
+
+      int score = dist(norm, dNorm) + dist(fon, dFon) * 2;
+      score += (palabra.length - d.length).abs();
+
+      if (score < mejorScore && score <= 4) {
+        mejorScore = score;
+        mejor = d;
+      }
+    }
+
+    return mejor;
+  }
+
+  String corregirTexto(String texto) =>
+      texto.split(RegExp(r'\s+')).map(corregirPalabra).join(" ");
+
+  // ================= DICCIONARIO =================
+  Future<void> cargarDiccionario() async {
+    final data = await rootBundle.loadString('assets/diccionario_es.json');
+    diccionario = List<String>.from(jsonDecode(data));
+
+    //print("Diccionario cargado: ${diccionario.length} palabras");
+    //print("Ejemplo: ${diccionario.take(10).toList()}");
+  }
+
+  // ================= ALÉRGENOS =================
   final Map<String, List<String>> alergenos = {
-    "gluten": ["trigo", "cebada", "centeno", "gluten", "malta"],
-    "lácteos": ["leche", "lactosa", "caseina"],
-    "huevo": ["huevo", "albumina"],
-    "frutos secos": ["almendra", "avellana", "nuez", "pistacho"],
+    "gluten": ["trigo", "cebada", "centeno", "gluten"],
+    "lácteos": ["leche", "lactosa"],
+    "huevo": ["huevo"],
+    "frutos secos": ["almendra", "avellana", "nuez"],
     "cacahuete": ["cacahuete", "mani"],
     "soja": ["soja"],
     "pescado": ["pescado"],
     "marisco": ["marisco"],
   };
 
-  // ================= DETECCIÓN =================
   List<String> detectarAlergenos(String texto) {
     final t = normalizar(texto);
-    List<String> encontrados = [];
+    List<String> res = [];
 
-    alergenos.forEach((categoria, palabras) {
-      for (var palabra in palabras) {
-        if (t.contains(palabra)) {
-          encontrados.add(categoria);
-          break;
-        }
-      }
+    alergenos.forEach((k, v) {
+      if (v.any((p) => t.contains(p))) res.add(k);
     });
 
-    return encontrados;
+    return res;
   }
 
   @override
   void initState() {
     super.initState();
-    _configurarYProcesar();
+    _init();
   }
 
-  Future<void> _configurarYProcesar() async {
+  Future<void> _init() async {
     await _tts.setLanguage("es-ES");
     await _tts.setSpeechRate(0.5);
-    _procesarOCR();
+    await cargarDiccionario();
+    await _procesar();
   }
 
-  Future<void> _procesarOCR() async {
-    final inputImage = InputImage.fromFilePath(widget.imagePath);
-    final textRecognizer = TextRecognizer();
+  Future<void> _procesar() async {
+    final input = InputImage.fromFilePath(widget.imagePath);
+    final recognizer = TextRecognizer();
 
-    try {
-      final recognizedText = await textRecognizer.processImage(inputImage);
+    final result = await recognizer.processImage(input);
+    recognizer.close();
 
-      String textoDetectado = recognizedText.text.isEmpty
-          ? "No se detectó texto"
-          : recognizedText.text;
+    String texto = result.text.isEmpty ? "No hay texto" : result.text;
 
-      // 🔥 DETECTAR ALÉRGENOS
-      final listaAlergenos = detectarAlergenos(textoDetectado);
+    texto = corregirTexto(texto); // 🔥 AQUÍ LA MAGIA
 
-      String mensajeFinal;
+    final alerg = detectarAlergenos(texto);
 
-      if (listaAlergenos.isNotEmpty) {
-        mensajeFinal =
-            "Atención. El producto contiene: ${listaAlergenos.join(", ")}";
-      } else {
-        mensajeFinal = "No se detectan alérgenos comunes";
-      }
+    String mensaje = alerg.isNotEmpty
+        ? "Atención contiene ${alerg.join(", ")}"
+        : "No se detectan alérgenos";
 
-      if (mounted) {
-        setState(() => _resultado = "$mensajeFinal\n\n$textoDetectado");
+    setState(() => _resultado = "$mensaje\n\n$texto");
 
-        // 🔊 SOLO LEE EL MENSAJE IMPORTANTE
-        await _tts.speak(mensajeFinal);
-        await _tts.speak(
-          _resultado,
-        ); // Opcional: leer todo el texto detectado después del mensaje de alérgenos
-      }
-    } finally {
-      textRecognizer.close();
-    }
-  }
-
-  @override
-  void dispose() {
-    _tts.stop();
-    super.dispose();
+    await _tts.speak(mensaje);
+    await _tts.speak(
+      _resultado,
+    ); // Opcional: leer todo el texto detectado después del mensaje de alérgenos
   }
 
   @override
@@ -284,23 +363,19 @@ class _ResultScreenState extends State<ResultScreen> {
       appBar: AppBar(title: const Text("Resultado")),
       body: Column(
         children: [
-          Expanded(
-            child: Image.file(
-              File(widget.imagePath),
-              key: ValueKey(widget.imagePath),
-              fit: BoxFit.contain,
-            ),
-          ),
-          Container(
-            padding: const EdgeInsets.all(20),
-            color: Colors.black87,
-            width: double.infinity,
+          Expanded(child: Image.file(File(widget.imagePath))),
+          Padding(
+            padding: const EdgeInsets.all(16),
             child: Text(
               _resultado,
-              style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+              style: const TextStyle(fontSize: 22),
               textAlign: TextAlign.center,
             ),
           ),
+          //ElevatedButton(
+          //onPressed: () => _tts.speak(_resultado),
+          //child: const Text("Repetir"),
+          //),
           ElevatedButton.icon(
             style: ElevatedButton.styleFrom(
               minimumSize: const Size.fromHeight(100),
