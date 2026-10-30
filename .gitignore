@@ -1,3 +1,12 @@
+# Archivos generados por Flutter
+.dart_tool/
+build/
+.flutter-plugins-dependencies
+
+# Configuración local del editor
+.idea/
+*.iml
+
 gradle-wrapper.jar
 /.gradle
 /captures/

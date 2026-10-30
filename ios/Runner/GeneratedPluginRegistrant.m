@@ -24,10 +24,22 @@
 @import google_mlkit_commons;
 #endif
 
+#if __has_include(<google_mlkit_language_id/GoogleMlKitLanguageIdPlugin.h>)
+#import <google_mlkit_language_id/GoogleMlKitLanguageIdPlugin.h>
+#else
+@import google_mlkit_language_id;
+#endif
+
 #if __has_include(<google_mlkit_text_recognition/GoogleMlKitTextRecognitionPlugin.h>)
 #import <google_mlkit_text_recognition/GoogleMlKitTextRecognitionPlugin.h>
 #else
 @import google_mlkit_text_recognition;
+#endif
+
+#if __has_include(<permission_handler_apple/PermissionHandlerPlugin.h>)
+#import <permission_handler_apple/PermissionHandlerPlugin.h>
+#else
+@import permission_handler_apple;
 #endif
 
 @implementation GeneratedPluginRegistrant
@@ -36,7 +48,9 @@
   [CameraPlugin registerWithRegistrar:[registry registrarForPlugin:@"CameraPlugin"]];
   [FlutterTtsPlugin registerWithRegistrar:[registry registrarForPlugin:@"FlutterTtsPlugin"]];
   [GoogleMlKitCommonsPlugin registerWithRegistrar:[registry registrarForPlugin:@"GoogleMlKitCommonsPlugin"]];
+  [GoogleMlKitLanguageIdPlugin registerWithRegistrar:[registry registrarForPlugin:@"GoogleMlKitLanguageIdPlugin"]];
   [GoogleMlKitTextRecognitionPlugin registerWithRegistrar:[registry registrarForPlugin:@"GoogleMlKitTextRecognitionPlugin"]];
+  [PermissionHandlerPlugin registerWithRegistrar:[registry registrarForPlugin:@"PermissionHandlerPlugin"]];
 }
 
 @end
