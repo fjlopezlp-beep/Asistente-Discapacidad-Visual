@@ -1,23 +1,32 @@
-# Archivos generados por Flutter
+# Dart / Flutter
 .dart_tool/
+.packages
+.pub-cache/
 build/
+.flutter-plugins
 .flutter-plugins-dependencies
 
-# Configuración local del editor
+# IDE
 .idea/
+.vscode/
 *.iml
 
-gradle-wrapper.jar
-/.gradle
-/captures/
-/gradlew
-/gradlew.bat
-/local.properties
-GeneratedPluginRegistrant.java
-.cxx/
+# Local Android configuration
+android/local.properties
 
-# Remember to never publicly share your keystore.
-# See https://flutter.dev/to/reference-keystore
-key.properties
-**/*.keystore
-**/*.jks
+# Generated / temporary
+*.log
+*.tmp
+*.bak
+*.zip
+*.rar
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Experimental data generated at runtime
+experimentos.csv
+errores_ocr.json
+trazabilidad*.json
+img_*.png
