@@ -2,7 +2,7 @@
 // Fco Javier López López
 // Fecha base: 2026-10-22
 
-// PRAECO USUARIO
+// PRAECO USUARIO v2.4.0 (candidata para validación)
 // Versión de uso final: sin ground truth, CER/WER, evaluación ni aprendizaje.
 // Utiliza exclusivamente los recursos incluidos en assets:
 //   - diccionario_es.json
@@ -58,16 +58,16 @@ class MetricasRendimiento {
 
 class ConfigCaptura {
   /// Número máximo de fotografías de la ráfaga "mejor de N".
-  static const int disparosMaximos = 3;
+  static const int disparosMaximos = 1; // Captura rápida: un único disparo
 
   /// Si una fotografía alcanza esta puntuación OCR se detiene la ráfaga.
   static const double puntuacionSuficiente = 0.92;
 
   /// Brillo medio del plano Y por debajo del cual se enciende la linterna.
-  static const double brilloParaLinterna = 80.0;
+  static const double brilloParaLinterna = 150.0; // Umbral experimental para etiquetas
 
   /// Espera tras fijar el punto de enfoque para que el autofoco converja.
-  static const int esperaEnfoqueMs = 400;
+  static const int esperaEnfoqueMs = 0; // Autofoco continuo; sin espera artificial
 
   /// Si es true, el texto que se corrige y se lee se limita a la zona
   /// "Ingredientes: ..." cuando ML Kit la localiza. Si no la localiza se
@@ -77,6 +77,9 @@ class ConfigCaptura {
   /// Si el OCR de la imagen preprocesada puntúa peor que el de la imagen
   /// sin procesar por más de este margen, se descarta el preprocesado.
   static const double margenPreprocesado = 0.05;
+  static const double umbralContrasteCLAHE = 25.0;
+  static const int intervaloAnalisisMs = 180;
+  static const int fotogramasEstables = 2;
 }
 
 // ==========================================================
@@ -155,14 +158,98 @@ double puntuarTextoOCR(String texto) {
 /// Escala de grises + estirado de rango + contraste. No se binariza porque
 /// ML Kit suele empeorar con imágenes en blanco y negro puro. Si la imagen es
 /// pequeña se amplía para que la altura de letra supere ~20 px.
-img.Image preprocesarParaOCR(img.Image entrada) {
-  var g = img.grayscale(entrada);
-  g = img.normalize(g, min: 0, max: 255);
-  g = img.adjustColor(g, contrast: 1.35);
-  if (g.width < 1600) {
-    g = img.copyResize(g, width: 1600, interpolation: img.Interpolation.linear);
+img.Image aplicarCLAHEPraeco(img.Image entrada, {double clipLimit = 2.0,
+    int tilesX = 8, int tilesY = 8}) {
+  final w = entrada.width, h = entrada.height;
+  if (w == 0 || h == 0) return entrada.clone();
+  tilesX = min(tilesX, w);
+  tilesY = min(tilesY, h);
+  final tw = (w + tilesX - 1) ~/ tilesX;
+  final th = (h + tilesY - 1) ~/ tilesY;
+  final mapas = List.generate(tilesX * tilesY, (_) => List<int>.filled(256, 0));
+  final lum = List<int>.filled(w * h, 0);
+  for (var y = 0; y < h; y++) {
+    for (var x = 0; x < w; x++) {
+      final p = entrada.getPixel(x, y);
+      lum[y * w + x] = (0.299 * p.r + 0.587 * p.g + 0.114 * p.b)
+          .round().clamp(0, 255);
+    }
   }
-  return g;
+  for (var ty = 0; ty < tilesY; ty++) {
+    for (var tx = 0; tx < tilesX; tx++) {
+      final x0 = tx * tw, y0 = ty * th;
+      final x1 = min(w, x0 + tw), y1 = min(h, y0 + th);
+      final area = (x1 - x0) * (y1 - y0);
+      final hist = List<int>.filled(256, 0);
+      for (var y = y0; y < y1; y++) {
+        for (var x = x0; x < x1; x++) {
+          hist[lum[y * w + x]]++;
+        }
+      }
+      final limit = max(1, (clipLimit * area / 256).round());
+      var excess = 0;
+      for (var i = 0; i < 256; i++) {
+        if (hist[i] > limit) {
+          excess += hist[i] - limit;
+          hist[i] = limit;
+        }
+      }
+      final each = excess ~/ 256, remainder = excess % 256;
+      for (var i = 0; i < 256; i++) hist[i] += each;
+      for (var i = 0; i < remainder; i++) {
+        hist[(i * 256 ~/ max(1, remainder)).clamp(0, 255)]++;
+      }
+      var cumulative = 0;
+      final map = mapas[ty * tilesX + tx];
+      for (var i = 0; i < 256; i++) {
+        cumulative += hist[i];
+        map[i] = (255.0 * cumulative / area).round().clamp(0, 255);
+      }
+    }
+  }
+  final out = entrada.clone();
+  for (var y = 0; y < h; y++) {
+    final fy = (y + 0.5) / th - 0.5;
+    final iy = fy.floor();
+    final y0 = iy.clamp(0, tilesY - 1), y1 = (iy + 1).clamp(0, tilesY - 1);
+    final wy = fy - iy;
+    for (var x = 0; x < w; x++) {
+      final fx = (x + 0.5) / tw - 0.5;
+      final ix = fx.floor();
+      final x0 = ix.clamp(0, tilesX - 1), x1 = (ix + 1).clamp(0, tilesX - 1);
+      final wx = fx - ix;
+      final v = lum[y * w + x];
+      final top = mapas[y0 * tilesX + x0][v] * (1 - wx) +
+          mapas[y0 * tilesX + x1][v] * wx;
+      final bottom = mapas[y1 * tilesX + x0][v] * (1 - wx) +
+          mapas[y1 * tilesX + x1][v] * wx;
+      final newY = (top * (1 - wy) + bottom * wy).clamp(0.0, 255.0);
+      final p = entrada.getPixel(x, y);
+      final factor = v > 1 ? newY / v : 1.0;
+      out.setPixelRgba(x, y,
+          (p.r * factor).round().clamp(0, 255),
+          (p.g * factor).round().clamp(0, 255),
+          (p.b * factor).round().clamp(0, 255), p.a.toInt());
+    }
+  }
+  return out;
+}
+
+/// No se procesa una imagen buena. La falta de nitidez exige nueva captura:
+/// CLAHE no recupera detalle perdido por desenfoque.
+img.Image preprocesarParaOCR(img.Image entrada,
+    ResultadoCalidadImagen calidad) {
+  if (calidad.contraste < ConfigCaptura.umbralContrasteCLAHE) {
+    return aplicarCLAHEPraeco(entrada);
+  }
+  // Corrección suave únicamente ante iluminación extrema.
+  if (calidad.brillo < AnalizadorCalidadImagen.minBrillo ||
+      calidad.brillo > AnalizadorCalidadImagen.maxBrillo) {
+    final factor = calidad.brillo < AnalizadorCalidadImagen.minBrillo
+        ? 1.15 : 0.85;
+    return img.adjustColor(entrada, brightness: factor - 1.0);
+  }
+  return entrada;
 }
 
 // ==========================================================
@@ -824,8 +911,8 @@ class _CameraScreenState extends State<CameraScreen> {
   int _ultimoAnalisisMs = 0;
   String _estado = 'Preparando cámara...';
   ResultadoCalidadImagen? _ultimaCalidad;
-  static const int _fotogramasNecesarios = 3;
-  static const int _intervaloAnalisisMs = 350;
+  static const int _fotogramasNecesarios = ConfigCaptura.fotogramasEstables;
+  static const int _intervaloAnalisisMs = ConfigCaptura.intervaloAnalisisMs;
 
   @override
   void initState() {
@@ -857,25 +944,41 @@ class _CameraScreenState extends State<CameraScreen> {
   }
 
   bool _linternaEncendida = false;
+  bool _cambiandoLinterna = false;
+  bool _linternaDisponible = true;
+  int _ultimoCambioLinternaMs = 0;
+  // Histéresis: evita encendidos/apagados continuos cerca del umbral.
+  // La linterna permanece encendida durante todo el intento de captura.
+  // No se apaga por cambios de brillo en la vista previa.
+  static const int _estabilizacionLinternaMs = 900;
 
-  /// Enciende la linterna si el último fotograma analizado era oscuro.
-  /// El usuario con discapacidad visual no puede juzgar la iluminación.
-  Future<void> _ajustarLinterna() async {
+  /// Controla la luz durante la vista previa, antes de decidir la captura.
+  /// No bloquea el callback del stream; evita cambios concurrentes.
+  Future<void> _ajustarLinterna({bool forzarEncendido = false}) async {
+    if (_cambiandoLinterna || !_linternaDisponible || !_controller.value.isInitialized) return;
     final brillo = _ultimaCalidad?.brillo;
-    final necesaria =
-        brillo != null && brillo < ConfigCaptura.brilloParaLinterna;
-    if (necesaria == _linternaEncendida) return;
+    if (brillo == null) return;
+    // Enclavamiento: una vez encendida, no se apaga hasta terminar la captura.
+    final bool necesaria = forzarEncendido ||
+        brillo < ConfigCaptura.brilloParaLinterna;
+    if (!necesaria || _linternaEncendida) return;
+    _cambiandoLinterna = true;
     try {
-      await _controller.setFlashMode(
-        necesaria ? FlashMode.torch : FlashMode.off,
-      );
+      await _controller.setFlashMode(FlashMode.torch);
       _linternaEncendida = necesaria;
-      if (necesaria) {
-        debugPrint('Linterna activada (brillo=${brillo.toStringAsFixed(0)})');
-        await Future.delayed(const Duration(milliseconds: 250));
-      }
+      _ultimoCambioLinternaMs = DateTime.now().millisecondsSinceEpoch;
+      _fotogramasAceptables = 0;
+      debugPrint(necesaria ? 'Linterna encendida (brillo=$brillo)' : 'Linterna apagada (brillo=$brillo)');
+      if (mounted) setState(() {
+        _estado = necesaria ? 'Linterna activada. Ajustando exposición…' : 'Iluminación suficiente. Evaluando…';
+      });
     } catch (e) {
-      debugPrint('No se pudo cambiar la linterna: $e');
+      // Algunos dispositivos no admiten torch con el stream de cámara.
+      _linternaDisponible = false;
+      debugPrint('Linterna no disponible en este dispositivo: $e');
+      if (mounted) setState(() => _estado = 'Linterna no disponible. Mejora la iluminación…');
+    } finally {
+      _cambiandoLinterna = false;
     }
   }
 
@@ -883,8 +986,12 @@ class _CameraScreenState extends State<CameraScreen> {
     if (!_linternaEncendida) return;
     try {
       await _controller.setFlashMode(FlashMode.off);
-    } catch (_) {}
+    } catch (e) {
+      debugPrint('No se pudo apagar la linterna: $e');
+    }
     _linternaEncendida = false;
+    _ultimoCambioLinternaMs = DateTime.now().millisecondsSinceEpoch;
+    if (mounted) setState(() {});
   }
 
   /// Fuerza el enfoque en el centro del encuadre y espera a que converja.
@@ -892,64 +999,22 @@ class _CameraScreenState extends State<CameraScreen> {
     try {
       await _controller.setFocusPoint(const Offset(0.5, 0.5));
       await _controller.setExposurePoint(const Offset(0.5, 0.5));
-      await Future.delayed(
-        const Duration(milliseconds: ConfigCaptura.esperaEnfoqueMs),
-      );
+      if (ConfigCaptura.esperaEnfoqueMs > 0) {
+        await Future.delayed(
+          const Duration(milliseconds: ConfigCaptura.esperaEnfoqueMs),
+        );
+      }
     } catch (e) {
       debugPrint('Aviso al fijar el punto de enfoque: $e');
     }
   }
 
-  /// Captura hasta N fotografías y elige la que mejor puntúa según el OCR
-  /// (fracción de palabras reconocidas en el diccionario). El OCR se ejecuta
-  /// sobre el fichero original (nativo, rápido) sin decodificar la imagen en
-  /// Dart; solo la fotografía elegida se decodifica después.
+  /// Una única fotografía; el flujo YUV ya ha verificado la calidad.
+  /// El OCR se ejecutará una sola vez en ResultScreen.
   Future<({XFile foto, String texto, double puntuacion, int disparos})>
-  _capturarMejorDeN() async {
-    final reconocedor = TextRecognizer(script: TextRecognitionScript.latin);
-    XFile? mejorFoto;
-    String mejorTexto = '';
-    double mejorPuntuacion = -1;
-    int disparos = 0;
-    try {
-      for (var i = 0; i < ConfigCaptura.disparosMaximos; i++) {
-        final foto = await _controller.takePicture();
-        disparos++;
-        double p = 0;
-        String texto = '';
-        try {
-          final res = await reconocedor.processImage(
-            InputImage.fromFilePath(foto.path),
-          );
-          texto = res.text;
-          p = puntuarTextoOCR(texto);
-        } catch (e) {
-          debugPrint('OCR de selección falló en el disparo $i: $e');
-        }
-        debugPrint('Disparo $i: puntuación OCR=${p.toStringAsFixed(3)}');
-        if (p > mejorPuntuacion) {
-          mejorPuntuacion = p;
-          mejorFoto = foto;
-          mejorTexto = texto;
-        }
-        if (mounted) {
-          setState(
-            () => _estado =
-                'Capturando ${i + 1}/${ConfigCaptura.disparosMaximos}…',
-          );
-        }
-        if (p >= ConfigCaptura.puntuacionSuficiente) break;
-        await Future.delayed(const Duration(milliseconds: 200));
-      }
-    } finally {
-      await reconocedor.close();
-    }
-    return (
-      foto: mejorFoto!,
-      texto: mejorTexto,
-      puntuacion: mejorPuntuacion < 0 ? 0.0 : mejorPuntuacion,
-      disparos: disparos,
-    );
+      _capturarMejorDeN() async {
+    final foto = await _controller.takePicture();
+    return (foto: foto, texto: '', puntuacion: 0.0, disparos: 1);
   }
 
   @override
@@ -1070,13 +1135,28 @@ class _CameraScreenState extends State<CameraScreen> {
       }
       final calidad = _analizarFotogramaY(frame);
       _ultimaCalidad = calidad;
+      // Encender la linterna ANTES de exigir una imagen aceptable.
+      // Esperar a que la cámara estabilice exposición/enfoque tras el cambio.
+      if (_cambiandoLinterna ||
+          now - _ultimoCambioLinternaMs < _estabilizacionLinternaMs) {
+        _fotogramasAceptables = 0;
+        return;
+      }
+      // Solo se permite ENCENDER. Nunca apagar por el aumento de brillo:
+      // eso provocaba el parpadeo encendido/apagado.
+      if (_linternaDisponible && !_linternaEncendida &&
+          calidad.brillo < ConfigCaptura.brilloParaLinterna) {
+        _fotogramasAceptables = 0;
+        _ajustarLinterna();
+        return;
+      }
       if (calidad.aceptable) {
         _fotogramasAceptables++;
         _estado =
             'Calidad correcta (${_fotogramasAceptables}/$_fotogramasNecesarios)…';
       } else {
         _fotogramasAceptables = 0;
-        _estado = 'Ajusta distancia, luz o enfoque…';
+        _estado = 'Esperando calidad: ${calidad.motivos.join(', ')}. Brillo ${calidad.brillo.toStringAsFixed(0)}';
       }
       if (mounted) setState(() {});
       if (_fotogramasAceptables >= _fotogramasNecesarios) {
@@ -1116,9 +1196,17 @@ class _CameraScreenState extends State<CameraScreen> {
     try {
       await _init;
       await _detenerFlujo();
-      // Aviso sonoro: el usuario debe mantener el móvil quieto durante la ráfaga.
-      _tts.speak('Capturando. Mantén el móvil quieto.');
-      await _ajustarLinterna();
+      // Evitar TTS durante el disparo: puede añadir latencia.
+      HapticFeedback.selectionClick();
+      // En modo automático la linterna ya se ajustó durante la vista previa.
+      // Para la captura manual, encenderla si el último fotograma era oscuro.
+      if (!automatico && !_linternaEncendida &&
+          (_ultimaCalidad?.brillo ?? 255) < ConfigCaptura.brilloParaLinterna) {
+        await _ajustarLinterna(forzarEncendido: true);
+        if (_linternaEncendida) {
+          await Future.delayed(const Duration(milliseconds: _estabilizacionLinternaMs));
+        }
+      }
       await _enfocarCentro();
       final seleccion = await _capturarMejorDeN();
       await _apagarLinterna();
@@ -1153,8 +1241,8 @@ class _CameraScreenState extends State<CameraScreen> {
         'contraste=${calidad.contraste.toStringAsFixed(2)}, aceptable=${calidad.aceptable}',
       );
 
-      String decisionCalidad = 'ACEPTADA';
-      if (!calidad.aceptable && automatico) {
+      String decisionCalidad = calidad.aceptable ? 'ACEPTADA' : 'PREPROCESAMIENTO_CONDICIONAL';
+      if (calidad.nitidez < AnalizadorCalidadImagen.minNitidez && automatico) {
         // El fotograma de vídeo puede tener buena calidad y la foto final no.
         // En ese caso no se procesa: se vuelve a buscar una captura válida.
         debugPrint(
@@ -1170,7 +1258,7 @@ class _CameraScreenState extends State<CameraScreen> {
         await _iniciarBusquedaAutomatica();
         return;
       }
-      if (!calidad.aceptable) {
+      if (!calidad.aceptable && !automatico) {
         HapticFeedback.heavyImpact();
         final motivos = calidad.motivos.join('. ');
         await _tts.speak(
@@ -1217,10 +1305,23 @@ class _CameraScreenState extends State<CameraScreen> {
       final pathPre = '${dir.path}/img_${idExperimento}_pre.jpg';
       HapticFeedback.mediumImpact();
       await File(path).writeAsBytes(img.encodeJpg(cropped, quality: 95));
+      String procesoMejora = 'Ninguno';
       try {
-        final pre = preprocesarParaOCR(cropped);
-        await File(pathPre).writeAsBytes(img.encodeJpg(pre, quality: 95));
+        final requiereMejora = calidad.contraste < ConfigCaptura.umbralContrasteCLAHE ||
+            calidad.brillo < AnalizadorCalidadImagen.minBrillo ||
+            calidad.brillo > AnalizadorCalidadImagen.maxBrillo;
+        if (requiereMejora) {
+          procesoMejora = calidad.contraste < ConfigCaptura.umbralContrasteCLAHE
+              ? 'CLAHE (mejora del contraste local)'
+              : 'Ajuste de iluminación (brillo)';
+          final relojPre = Stopwatch()..start();
+          final pre = preprocesarParaOCR(cropped, calidad);
+          await File(pathPre).writeAsBytes(img.encodeJpg(pre, quality: 90));
+          relojPre.stop();
+          debugPrint('Preprocesamiento condicional: ${relojPre.elapsedMilliseconds} ms');
+        }
       } catch (e) {
+        procesoMejora = 'Error en el preprocesamiento';
         debugPrint('Preprocesado no disponible: $e');
       }
       final preExiste = await File(pathPre).exists();
@@ -1261,8 +1362,7 @@ class _CameraScreenState extends State<CameraScreen> {
   Widget build(BuildContext context) {
     final size = MediaQuery.of(context).size;
     return Scaffold(
-      body: Stack(
-        children: [
+      body: Stack(        children: [
           FutureBuilder<void>(
             future: _init,
             builder: (_, snap) => snap.connectionState == ConnectionState.done
@@ -1309,7 +1409,7 @@ class _CameraScreenState extends State<CameraScreen> {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   const Text(
-                    'Praeco Usuario\nCAPTURA AUTOMÁTICA',
+                    'Praeco v2.4.0\nCAPTURA AUTOMÁTICA',
                     textAlign: TextAlign.center,
                     style: TextStyle(
                     fontSize: 18,
@@ -1332,6 +1432,16 @@ class _CameraScreenState extends State<CameraScreen> {
                       style: const TextStyle(fontSize: 12),
                     ),
                   ],
+                  const SizedBox(height: 4),
+                  Text(
+                    !_linternaDisponible ? 'Linterna: no disponible' :
+                    _linternaEncendida ? 'Linterna: ENCENDIDA (luz continua)' :
+                    'Linterna: apagada',
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: _linternaEncendida ? Colors.amberAccent : Colors.white70,
+                    ),
+                  ),
                   const SizedBox(height: 8),
                   Wrap(
                     alignment: WrapAlignment.center,
@@ -1362,7 +1472,7 @@ class _CameraScreenState extends State<CameraScreen> {
             child: Padding(
               padding: EdgeInsets.only(bottom: 8),
               child: Text(
-                'PRAECO · ASISTENTE PARA LECTURA DE ETIQUETAS',
+                'TFM: ASISTENTE PARA PERSONAS CON DISCAPACIDAD VISUAL',
                 textAlign: TextAlign.center,
                 style: TextStyle(
                   fontSize: 11,
@@ -1379,6 +1489,165 @@ class _CameraScreenState extends State<CameraScreen> {
   }
 }
 
+class EvaluacionOCR {
+  static Future<void> guardarExperimento({
+    required String imagen,
+    required String textoReal,
+    required String ocr,
+    required String corregido,
+    required double cerOCR,
+    required double cerCorregido,
+    required double werOCR,
+    required double werCorregido,
+    required int tiempoCaptura,
+    required int tiempoOCR,
+    required int tiempoCorreccion,
+    required int tiempoAlergenos,
+    required ResultadoCalidadImagen calidadImagen,
+    required String decisionCalidad,
+    required bool modoAprendizaje,
+  }) async {
+    final carpeta = await obtenerCarpetaTFM();
+
+    final fichero = File('${carpeta.path}/experimentos.csv');
+
+    print('====================================');
+    print('GUARDANDO EXPERIMENTO');
+    print('CSV: ${fichero.path}');
+    print('Imagen: $imagen');
+
+    // --------------------------------------------------
+    // 1. LIMPIAR TEXTOS
+    // --------------------------------------------------
+
+    String limpiarTexto(String texto) {
+      return texto
+          .replaceAll('\n', ' ')
+          .replaceAll('\r', ' ')
+          .replaceAll('"', '""')
+          .trim();
+    }
+
+    textoReal = limpiarTexto(textoReal);
+    ocr = limpiarTexto(ocr);
+    corregido = limpiarTexto(corregido);
+
+    // --------------------------------------------------
+    // 2. CABECERA DEL CSV Y VALIDACIÓN DE ESTRUCTURA
+    // --------------------------------------------------
+
+    const String cabeceraCSV =
+        'fecha,imagen,texto_real,ocr,ocr_corregido,'
+        'cer_ocr,cer_corregido,wer_ocr,wer_corregido,'
+        'ancho,alto,nitidez,brillo,contraste,calidad_aceptable,decision_calidad,'
+        't_captura,t_ocr,t_correccion,t_alergenos,modo_aprendizaje\n';
+
+    const int numeroColumnasEsperadas = 21;
+
+    // Comprueba el número de columnas respetando las comas que puedan existir
+    // dentro de campos de texto entre comillas.
+    int contarColumnasCSV(String linea) {
+      int columnas = 1;
+      bool dentroDeComillas = false;
+
+      for (int i = 0; i < linea.length; i++) {
+        final caracter = linea[i];
+
+        if (caracter == '"') {
+          // Una comilla doble escapada ("") no cambia el estado.
+          if (dentroDeComillas && i + 1 < linea.length && linea[i + 1] == '"') {
+            i++;
+            continue;
+          }
+          dentroDeComillas = !dentroDeComillas;
+        } else if (caracter == ',' && !dentroDeComillas) {
+          columnas++;
+        }
+      }
+
+      return columnas;
+    }
+
+    bool csvNecesitaReconstruccion = false;
+
+    if (await fichero.exists()) {
+      final contenidoActual = await fichero.readAsString();
+      final lineas = contenidoActual
+          .split(RegExp(r'\r?\n'))
+          .where((linea) => linea.trim().isNotEmpty)
+          .toList();
+
+      if (lineas.isEmpty || lineas.first != cabeceraCSV.trim()) {
+        csvNecesitaReconstruccion = true;
+      } else {
+        // También comprobamos las filas existentes. Esto es importante porque
+        // una versión anterior de Praeco podía tener la cabecera nueva pero
+        // filas antiguas de 13 columnas.
+        for (int i = 1; i < lineas.length; i++) {
+          if (contarColumnasCSV(lineas[i]) != numeroColumnasEsperadas) {
+            csvNecesitaReconstruccion = true;
+            break;
+          }
+        }
+      }
+
+      if (csvNecesitaReconstruccion) {
+        final marca = DateTime.now().millisecondsSinceEpoch;
+        final respaldo = File(
+          '${carpeta.path}/experimentos_respaldo_$marca.csv',
+        );
+
+        await fichero.rename(respaldo.path);
+        await fichero.writeAsString(cabeceraCSV);
+
+        print('CSV anterior incompatible conservado en: ${respaldo.path}');
+      }
+    } else {
+      await fichero.writeAsString(cabeceraCSV);
+      print('CSV creado con $numeroColumnasEsperadas columnas');
+    }
+
+    // --------------------------------------------------
+    // 3. CREAR LA FILA COMPLETA: EXACTAMENTE 21 COLUMNAS
+    // --------------------------------------------------
+
+    final linea = <String>[
+      DateTime.now().toIso8601String(),
+      '"$imagen"',
+      '"$textoReal"',
+      '"$ocr"',
+      '"$corregido"',
+      cerOCR.toStringAsFixed(6),
+      cerCorregido.toStringAsFixed(6),
+      werOCR.toStringAsFixed(6),
+      werCorregido.toStringAsFixed(6),
+      calidadImagen.ancho.toString(),
+      calidadImagen.alto.toString(),
+      calidadImagen.nitidez.toStringAsFixed(4),
+      calidadImagen.brillo.toStringAsFixed(4),
+      calidadImagen.contraste.toStringAsFixed(4),
+      calidadImagen.aceptable ? 'true' : 'false',
+      decisionCalidad,
+      tiempoCaptura.toString(),
+      tiempoOCR.toString(),
+      tiempoCorreccion.toString(),
+      tiempoAlergenos.toString(),
+      modoAprendizaje ? 'true' : 'false',
+    ].join(',');
+
+    // Verificación interna: nunca escribir una fila que no tenga 21 columnas.
+    assert(
+      contarColumnasCSV(linea) == numeroColumnasEsperadas,
+      'Error: la fila CSV no contiene $numeroColumnasEsperadas columnas.',
+    );
+
+    await fichero.writeAsString('$linea\n', mode: FileMode.append);
+
+    print('Fila añadida correctamente');
+    print('OCR corregido: $corregido');
+    print('====================================');
+  }
+}
 // ================= RESULTADO =================
 
 class ResultScreen extends StatefulWidget {
