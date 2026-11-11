@@ -1,0 +1,24 @@
+% ------------------------------------------------
+% ABSTRACT
+% ------------------------------------------------
+
+\selectlanguage{english}%
+\noindent \begin{center}
+\section*{Abstract}
+\par\end{center}
+
+People with visual impairments experience difficulties in independently accessing the textual information provided on the labels of everyday products. This Master's Thesis presents the design, development, and evaluation of \textit{Praeco}, an accessible assistant based on computer vision, optical character recognition, and speech synthesis, implemented for Android mobile devices.
+
+The system integrates, on a mobile device, a processing pipeline comprising image acquisition using the device's camera, automatic image quality assessment based on sharpness, brightness, and contrast parameters, region-of-interest cropping, optical character recognition using Google ML Kit, filtering and reconstruction of the recognized text, lexical correction, detection of terms associated with allergens, and presentation of the results through speech synthesis.
+
+A subsequent acquisition optimisation introduces single-image automatic capture, stable auxiliary lighting under insufficient illumination, and conditional image enhancement using CLAHE. These changes are reported separately from the main validation of the lexical corrector.
+
+To improve errors produced by the OCR process, a conservative correction system has been developed that combines Levenshtein distance, phonetic similarity, word-length criteria, word-protection mechanisms, and lexical resources. The system also incorporates an adaptive learning mechanism that allows knowledge to be obtained from errors observed during the development phase. Once the learning process has been completed, the resulting resources are frozen so that validation can be performed without modifying the behaviour of the correction system during the experiments.
+
+The final architecture has been organised into three complementary applications: \textit{Praeco Development}, used for development, learning, and experimental evaluation; \textit{Praeco User}, intended for the normal operation of the assistant using the previously obtained learning resources; and \textit{Praeco Analysis}, developed for processing and analysing the experimental results.
+
+The final evaluation was performed on 63 records with learning disabled. The results show a reduction in the mean Character Error Rate (CER) from 0.0646 to 0.0621 and in the mean Word Error Rate (WER) from 0.1834 to 0.1717 after applying the correction system. The correction improved 15 cases, worsened 6, and left 42 unchanged, while also preserving the five cases in which the initial OCR output was error-free. These results show a moderate overall improvement and demonstrate the conservative nature of the correction system, while also indicating that its effect depends on the characteristics of the errors produced by the OCR process.
+
+The developed prototype demonstrates the feasibility of integrating computer vision and text-processing techniques into commercially available mobile devices to facilitate independent access to textual information. Praeco therefore constitutes a low-cost solution and an experimental platform for the further development of recognition, correction, and accessible assistance mechanisms.
+
+\textbf{Keywords:} visual impairment, computer vision, optical character recognition, OCR, Google ML Kit, lexical correction, adaptive learning, accessibility, speech synthesis, Android.

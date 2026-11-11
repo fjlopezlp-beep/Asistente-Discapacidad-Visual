@@ -1,0 +1,41 @@
+% ============================================================
+% APÉNDICE A - SOFTWARE DESARROLLADO
+% ============================================================
+\chapter{Software desarrollado}
+\label{ap:software}
+
+\section{Introducción}
+Como parte de este Trabajo Fin de Máster se ha desarrollado \textit{Praeco}, un sistema software orientado a facilitar el acceso a la información textual presente en el etiquetado de productos mediante técnicas de visión artificial, reconocimiento óptico de caracteres y síntesis de voz. La versión final se organiza en tres aplicaciones independientes: \textbf{Praeco Desarrollo}, \textbf{Praeco Usuario} y \textbf{Praeco Análisis}.
+
+\section{Repositorio y versión de referencia}
+El código fuente correspondiente a la versión final de Praeco se encuentra disponible públicamente en el repositorio GitHub del proyecto:
+\begin{center}
+\url{https://github.com/fjlopezlp-beep/Asistente-Discapacidad-Visual}
+\end{center}
+La versión utilizada como referencia para la entrega final se identifica mediante la etiqueta \texttt{v2.3.1-TFM} y la \textit{release} \textbf{Praeco v2.3.1 -- TFM}. Las tres aplicaciones se identifican con la versión \texttt{2.3.1+1}.
+
+\section{Estructura del repositorio}
+El repositorio separa las tres aplicaciones en los directorios \texttt{Praeco\_Desarrollo}, \texttt{Praeco\_Usuario} y \texttt{Praeco\_Analisis}. Cada aplicación conserva su propio código fuente, recursos, configuración Android y ficheros \texttt{pubspec.yaml} y \texttt{pubspec.lock}. No se incluyen cachés de Flutter, resultados de compilación ni configuraciones locales del entorno de desarrollo.
+
+\section{Praeco Desarrollo}
+Praeco Desarrollo corresponde a la aplicación utilizada durante las fases de implementación, aprendizaje, experimentación y validación. Integra la adquisición y evaluación de calidad de la imagen, selección de la región de interés, OCR mediante Google ML Kit, filtrado y reconstrucción del texto, corrección léxica, recursos de aprendizaje adaptativo, detección de términos asociados a alérgenos, síntesis de voz y evaluación mediante CER y WER. Durante la validación final, los recursos de aprendizaje se mantienen congelados.
+
+\section{Praeco Usuario}
+Praeco Usuario constituye la versión destinada al funcionamiento normal del asistente. No requiere la introducción de \textit{ground truth} ni realiza el cálculo de CER y WER durante su utilización. Emplea los recursos lingüísticos previamente obtenidos y congelados, manteniendo estable el comportamiento del corrector.
+
+\section{Praeco Análisis}
+Praeco Análisis es una aplicación independiente destinada al tratamiento estadístico de los resultados experimentales. Permite estudiar CER, WER, comportamiento del corrector, variables de calidad de imagen y tiempos de procesamiento. No necesita los diccionarios empleados por el corrector, puesto que analiza resultados previamente obtenidos y no ejecuta de nuevo el proceso de corrección.
+
+\section{Requisitos de compilación}
+Cada aplicación dispone de su propio fichero \texttt{pubspec.yaml}. Una vez instalado y configurado Flutter, las dependencias pueden recuperarse mediante \texttt{flutter pub get}; la aplicación puede ejecutarse con \texttt{flutter run} y puede generarse un APK de distribución mediante \texttt{flutter build apk --release}.
+
+\section{Reproducibilidad}
+La combinación del código fuente, los recursos necesarios, la definición y bloqueo de dependencias, la etiqueta Git específica y la \textit{release} asociada permite identificar de forma inequívoca el estado del software utilizado como referencia para el Trabajo Fin de Máster.
+
+\section{Datos generados durante la experimentación}
+Durante la ejecución de Praeco Desarrollo se utiliza el directorio \texttt{TFM\_OCR} del dispositivo Android para almacenar datos generados durante los experimentos. Este directorio constituye un espacio de trabajo y no forma parte del código fuente necesario para compilar la aplicación.
+
+Para garantizar la trazabilidad de la evaluación presentada en esta memoria se ha preparado un conjunto de validación independiente, publicado como archivo adicional de la \textit{release} \texttt{v2.3.1-TFM}. El archivo \texttt{Praeco\_Dataset\_Validacion\_TFM.zip} contiene el fichero de resultados correspondiente a 63 registros de validación con el aprendizaje desactivado, las imágenes asociadas y la información de trazabilidad disponible.
+
+\section{Disponibilidad del software}
+La versión de referencia utilizada para la entrega de este Trabajo Fin de Máster es \textbf{Praeco v2.3.1 -- TFM}, identificada mediante la etiqueta \texttt{v2.3.1-TFM} en el repositorio indicado anteriormente.

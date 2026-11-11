@@ -1,0 +1,91 @@
+\chapter{Conclusiones y trabajos futuros}
+
+% ------------------------------------------------
+\section{Conclusiones}
+% ------------------------------------------------
+
+El desarrollo realizado en este Trabajo Fin de Máster ha permitido diseñar, implementar y evaluar un asistente móvil orientado a facilitar el acceso a la información textual presente en etiquetas de productos a personas con discapacidad visual. El sistema desarrollado, denominado Praeco, combina técnicas de visión artificial, reconocimiento óptico de caracteres, procesamiento lingüístico, aprendizaje adaptativo, detección de términos asociados a alérgenos y síntesis de voz dentro de una aplicación ejecutable sobre dispositivos Android convencionales.
+
+El trabajo ha evolucionado desde un prototipo centrado fundamentalmente en la captura y reconocimiento OCR hasta un ecosistema formado por tres aplicaciones diferenciadas: \textit{Praeco Desarrollo}, \textit{Praeco Usuario} y \textit{Praeco Análisis}. Esta separación permite distinguir claramente las tareas de experimentación y aprendizaje, el funcionamiento normal del asistente y el análisis posterior de los resultados.
+
+Praeco Desarrollo incorpora la instrumentación necesaria para evaluar el sistema mediante \textit{ground truth}, calcular las métricas CER y WER, registrar los tiempos de ejecución, almacenar las variables asociadas a la calidad de imagen y realizar aprendizaje adaptativo. Praeco Usuario utiliza los recursos obtenidos durante el desarrollo, pero elimina los mecanismos de evaluación y aprendizaje que no son necesarios durante el funcionamiento normal. Finalmente, Praeco Análisis permite procesar los ficheros experimentales y obtener automáticamente estadísticas sobre las métricas de reconocimiento, comportamiento del corrector, calidad de imagen y coste temporal.
+
+Uno de los resultados más relevantes del trabajo ha sido comprobar que la corrección posterior al OCR debe realizarse de forma conservadora. Las primeras versiones mostraron que una estrategia excesivamente permisiva podía corregir determinados errores y, al mismo tiempo, modificar palabras que originalmente habían sido reconocidas correctamente. Como consecuencia, el corrector evolucionó incorporando reglas de protección, distancia de Levenshtein, criterios fonéticos, umbrales dependientes de la longitud de las palabras, criterios de confianza y vocabulario adaptativo.
+
+El aprendizaje adaptativo permite incorporar progresivamente vocabulario validado durante la fase de desarrollo. Este conocimiento se almacena principalmente
+
+ en \texttt{diccionario\_adaptativo.json} y puede reutilizarse posteriormente para reconocer como válidos términos previamente aprendidos. Este mecanismo no modifica el funcionamiento interno de Google ML Kit ni el OCR bruto, sino que mejora la etapa posterior de corrección y contribuye a obtener un texto \texttt{ocr\_corregido} más preciso.
+
+Debe señalarse que el fichero \texttt{experimentos.csv} se ha construido progresivamente durante las distintas etapas de desarrollo, análisis y mejora de Praeco. Por este motivo, el conjunto completo de registros refleja también la evolución del sistema y de los recursos lingüísticos empleados. Durante las fases con aprendizaje activo se fue enriqueciendo el \texttt{diccionario\_adaptativo.json}, mientras que en la validación final los recursos fueron congelados mediante \texttt{modo\_aprendizaje = false}, evitando que los propios datos utilizados para validar el sistema modificasen simultáneamente el conocimiento adquirido.
+
+Los resultados obtenidos en el conjunto de 63 registros analizado con los recursos congelados muestran una mejora global moderada después de aplicar el corrector. El CER medio disminuye de 0.0646 a 0.0621 y el WER medio de 0.1834 a 0.1717. Praeco Análisis calcula una mejora media del CER del 4.745\,\% y del WER del 4.438\,\%.
+
+Esta mejora global no se produce de forma uniforme en todos los experimentos. En el análisis del CER, 15 registros mejoran, 6 empeoran y 42 permanecen sin cambios. Asimismo, los cinco registros en los que el OCR inicial era perfecto se conservan sin introducir errores adicionales. Este comportamiento resulta coherente con la estrategia conservadora adoptada: cuando el sistema no dispone de evidencia suficiente para realizar una sustitución, resulta preferible conservar el término reconocido originalmente.
+
+La auditoría del \textit{ground truth} ha resultado igualmente fundamental para la evaluación experimental. CER y WER únicamente proporcionan resultados fiables cuando el texto utilizado como referencia representa fielmente el contenido de la etiqueta. Este proceso permitió además comprobar la existencia legítima de nombres comerciales, nombres propios y términos pertenecientes a diferentes idiomas. Por tanto, el aprendizaje adaptativo no debe interpretarse como un mecanismo de traducción al castellano: una palabra extranjera presente realmente en la etiqueta constituye un término válido y debe conservarse.
+
+Otro resultado relevante corresponde al análisis temporal. Para los 63 registros evaluados se obtiene un tiempo medio total de aproximadamente 4432~ms. La mayor parte corresponde a la adquisición y selección de la imagen, con aproximadamente 4110~ms, mientras que el reconocimiento OCR requiere alrededor de 251~ms. La corrección presenta un coste medio próximo a 63~ms y la detección de términos asociados a alérgenos aproximadamente 8~ms. Por tanto, las etapas específicas añadidas por Praeco después del OCR representan una fracción reducida del tiempo global de procesamiento.
+
+Como evolución posterior a la validación principal, se ha incorporado una estrategia de captura única con evaluación previa, iluminación auxiliar continua y preprocesamiento condicional mediante CLAHE. Dos ensayos exploratorios muestran tiempos de captura de 1842 y 1530~ms, pero no constituyen una validación controlada de la mejora ni permiten atribuir a CLAHE un incremento de precisión.
+
+En conjunto, los resultados obtenidos permiten concluir que Praeco constituye un prototipo funcional capaz de integrar en un dispositivo móvil las principales etapas necesarias para capturar una etiqueta, seleccionar una imagen adecuada, reconocer su contenido textual, aplicar una corrección conservadora, identificar determinados términos asociados a alérgenos y comunicar el resultado mediante síntesis de voz.
+
+% ------------------------------------------------
+\section{Aportaciones principales del trabajo}
+% ------------------------------------------------
+
+Las principales aportaciones realizadas durante el desarrollo del proyecto pueden resumirse en los siguientes puntos:
+
+\begin{itemize}[noitemsep]
+	
+	\item Desarrollo de una aplicación móvil accesible basada en Flutter y orientada a personas con discapacidad visual.
+	
+	\item Implementación inicial de adquisición y selección entre tres fotografías, posteriormente optimizada mediante evaluación de fotogramas en vista previa y captura automática única, con iluminación auxiliar estabilizada.
+	
+	\item Incorporación de preprocesamiento condicional de imagen mediante CLAHE y ajustes de iluminación, con conservación y comparación visual de la fotografía original y la procesada.
+
+\item Definición de una región de interés (\textit{Region of Interest}, ROI) para reducir la información innecesaria y concentrar el reconocimiento sobre la zona relevante de la etiqueta.
+	
+	\item Integración de Google ML Kit como motor de reconocimiento óptico de caracteres.
+	
+	\item Desarrollo de un sistema propio de filtrado y reconstrucción del texto obtenido mediante OCR.
+	
+	\item Implementación de un corrector léxico híbrido basado en distancia de Levenshtein, información fonética, diferencias de longitud, criterios de confianza y mecanismos de protección de términos válidos.
+	
+	\item Desarrollo de un mecanismo de aprendizaje incremental basado en los errores observados durante los experimentos y en la incorporación de vocabulario validado al \texttt{diccionario\_adaptativo.json}.
+	
+	\item Implementación de mecanismos específicos para proteger números, unidades, palabras cortas, nombres propios, marcas y vocabulario multilingüe presente legítimamente en las etiquetas.
+	
+	\item Detección automática de términos asociados a diferentes categorías de alérgenos y consideración de expresiones de ausencia o negación, como ``sin gluten'', para reducir falsos positivos.
+	
+	\item Integración de síntesis de voz para comunicar al usuario el texto reconocido y las advertencias obtenidas.
+	
+\end{itemize}
+	
+
+
+% ------------------------------------------------
+\section{Trabajos futuros}
+% ------------------------------------------------
+
+Los resultados obtenidos permiten identificar varias líneas de continuación que pueden mejorar tanto la robustez técnica de Praeco como la validez externa de su evaluación.
+
+\begin{itemize}[noitemsep]
+    \item \textbf{Ampliación del corpus experimental.} Incrementar el número y la diversidad de etiquetas, condiciones de iluminación, tipografías, materiales de envase y dispositivos permitiría caracterizar con mayor precisión el comportamiento del sistema y estudiar su capacidad de generalización.
+
+    \item \textbf{Evaluación con usuarios.} La validación realizada en este TFM se centra principalmente en métricas técnicas. Un trabajo posterior debería incorporar pruebas de usabilidad y accesibilidad con personas con discapacidad visual, evaluando aspectos como facilidad de captura, comprensión de los mensajes, tiempos percibidos y utilidad en situaciones reales.
+
+    \item \textbf{Mejora del tratamiento multilingüe.} Las etiquetas comerciales pueden contener nombres propios y términos en distintos idiomas. Resulta de interés ampliar los mecanismos de protección e identificación lingüística para reducir correcciones indebidas sin convertir el corrector en un sistema de traducción.
+
+    \item \textbf{Evaluación de mecanismos contextuales.} Los recursos basados en n-gramas se encuentran disponibles en el proyecto, pero la corrección contextual no forma parte de la ruta activa evaluada en los 63 registros finales. Una línea futura consiste en activar y validar experimentalmente este mecanismo mediante un estudio de ablación que permita cuantificar su aportación independiente.
+
+    \item \textbf{Ampliación de la detección de alérgenos.} El módulo actual identifica términos asociados a determinadas categorías y expresiones de negación. Su evolución debería contemplar vocabulario más amplio, variantes lingüísticas y una validación específica sobre etiquetado alimentario. En cualquier caso, esta función debe mantenerse como ayuda informativa y no como certificación de seguridad alimentaria.
+
+    \item \textbf{Optimización de la adquisición.} Dado que la captura y selección de la imagen concentra la mayor parte del tiempo total de procesamiento, la versión optimizada debe validarse con un corpus ampliado y condiciones controladas, comparando el tiempo extremo a extremo y la robustez de la activación de la linterna.
+
+    \item \textbf{Evaluación específica de CLAHE.} Realizar un ensayo de ablación con las mismas imágenes, sin mejora, con CLAHE y con ajustes de brillo; medir CER, WER, latencia y posibles empeoramientos, manteniendo congelado el corrector.
+
+    \item \textbf{Comparación entre dispositivos y motores OCR.} La evaluación en diferentes terminales Android y la comparación controlada con otros motores de reconocimiento permitirían determinar qué parte del rendimiento depende de la plataforma y qué parte corresponde específicamente a las etapas desarrolladas en Praeco.
+\end{itemize}
+
+Estas líneas permitirían evolucionar Praeco desde el prototipo funcional y experimental desarrollado en este TFM hacia una herramienta asistencial más robusta, manteniendo como principio metodológico la separación entre aprendizaje, validación y uso final.

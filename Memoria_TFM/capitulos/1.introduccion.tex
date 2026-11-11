@@ -1,0 +1,76 @@
+% ------------------------------------------------
+% INTRODUCCIÓN
+% ------------------------------------------------
+
+\chapter{Introducción}  
+
+\section{Motivación}
+
+En la última década, la proliferación de los dispositivos móviles y el avance de la inteligencia artificial han transformado radicalmente la interacción entre los seres humanos y su entorno. Sin embargo, a pesar de estos avances, las personas con discapacidad visual siguen enfrentando desafíos significativos en tareas cotidianas que el resto de la población da por sentadas. La lectura de indicaciones en la vía pública, la interpretación de etiquetas informativas o el acceso a documentos impresos en tiempo real son barreras que limitan la autonomía personal y la inclusión social.\\
+
+Este proyecto se centra en el desarrollo de una aplicación móvil multiplataforma que actúa como un puente sensorial. Utilizando técnicas de visión artificial y procesamiento de lenguaje natural, el sistema busca convertir información visual en estímulos auditivos, permitiendo que el usuario "lea" su entorno de manera fluida y eficiente.\\
+
+La motivación principal de este trabajo surge de la brecha existente entre las capacidades tecnológicas actuales y su aplicación real en el ámbito de la accesibilidad. Aunque existen herramientas comerciales de asistencia, muchas presentan barreras de coste, requieren hardware específico o carecen de una interfaz adaptada a la baja visión.\\
+
+La elección de Flutter como entorno de desarrollo y la integración de servicios de OCR de última generación responde a la necesidad de crear una herramienta democrática: una solución de software que pueda ejecutarse en teléfonos inteligentes convencionales sin necesidad de inversiones adicionales. La posibilidad de mejorar la calidad de vida de los usuarios mediante la ingeniería de software, transformando un dispositivo común en un asistente inteligente y proactivo, constituye el motor fundamental de esta investigación.\\
+
+Para identificar visualmente la aplicación he creado el siguiente icono  al que he llamado Praeco.
+
+\noindent
+\begin{minipage}[c]{0.20\textwidth}
+	\centering
+	\includegraphics[width=\linewidth]{imagenes/Heraldo_robotico.png}
+
+	\label{fig:Heraldo_robotico}
+\end{minipage}
+\hfill
+\begin{minipage}[c]{0.55\textwidth}
+\begin{center}
+		\textbf{{\LARGE PRAECO}}
+\end{center}
+	\textit{Los praecones (singular: \textbf{praeco}) eran los heraldos oficiales en la Antigua Roma. Su función era ser la "voz pública" del Estado.}
+\end{minipage}
+
+\section{Propuesta y objetivos}
+
+El objetivo general de este Trabajo Fin de Máster es diseñar, desarrollar y evaluar un sistema móvil de asistencia para personas con discapacidad visual o baja visión, denominado \textit{Praeco}, capaz de reconocer información textual presente en el etiquetado de productos, mejorar de forma conservadora los errores producidos durante el reconocimiento OCR, detectar posibles alérgenos y comunicar la información obtenida mediante síntesis de voz.
+
+Como resultado de la evolución del proyecto, Praeco se ha estructurado en un ecosistema formado por tres aplicaciones independientes pero relacionadas entre sí: \textbf{Praeco Desarrollo}, \textbf{Praeco Usuario} y \textbf{Praeco Análisis}. Esta separación permite diferenciar claramente las funciones de desarrollo, aprendizaje y evaluación experimental de aquellas necesarias para el funcionamiento de la aplicación destinada al usuario final.
+
+Los objetivos específicos del proyecto son los siguientes:
+
+\begin{itemize}
+	
+	\item Diseñar e implementar una arquitectura de procesamiento capaz de adquirir imágenes mediante la cámara del dispositivo móvil, seleccionar una región de interés y evaluar automáticamente su calidad mediante parámetros de nitidez, brillo y contraste.
+	
+	\item Estudiar la optimización de la captura automática mediante análisis previo de fotogramas, iluminación auxiliar y mejora condicional del contraste con CLAHE.
+
+\item Integrar un motor de reconocimiento óptico de caracteres basado en Google ML Kit que permita obtener el texto presente en etiquetas y otros soportes impresos utilizando un dispositivo Android convencional.
+	
+	\item Desarrollar un sistema híbrido y conservador de corrección de errores OCR basado en distancia de Levenshtein, semejanza fonética, diccionarios lingüísticos, reglas de protección, vocabulario adaptativo y mecanismos de aprendizaje incremental.
+	
+	\item Implementar mecanismos de filtrado y reconstrucción del texto reconocido que permitan reducir información irrelevante y preparar los tokens para las etapas posteriores de corrección y análisis.
+	
+	\item Incorporar un módulo de detección de alérgenos capaz de identificar términos asociados a gluten, lácteos, huevo, frutos secos, cacahuete, soja, pescado y marisco, considerando además determinadas expresiones de ausencia, como \textit{«sin gluten»}, con el objetivo de reducir falsos positivos.
+	
+	\item Proporcionar una salida accesible mediante síntesis de voz (\textit{Text-to-Speech}, TTS), de forma que el texto reconocido, corregido y las advertencias generadas puedan ser comunicados auditivamente al usuario.
+	
+	\item Desarrollar \textbf{Praeco Desarrollo} como aplicación destinada a la experimentación y evolución del sistema. Esta versión incorpora las funciones de captura, OCR, corrección, detección de alérgenos y TTS, junto con mecanismos específicos de introducción del \textit{ground truth}, aprendizaje adaptativo, trazabilidad, almacenamiento de experimentos y evaluación cuantitativa mediante CER y WER.
+	
+	\item Implementar en Praeco Desarrollo un sistema de aprendizaje incremental capaz de registrar asociaciones entre errores OCR y palabras correctas, controlar su frecuencia y posibles conflictos, y generar progresivamente un diccionario adaptativo con vocabulario válido aprendido durante la fase experimental.
+	
+	\item Desarrollar \textbf{Praeco Usuario} como una aplicación independiente destinada al uso normal del asistente. Esta versión utiliza los recursos lingüísticos previamente aprendidos y congelados, conservando únicamente las funciones necesarias para el usuario: cámara, evaluación de calidad, OCR, filtrado, corrección, detección de alérgenos y síntesis de voz, sin incorporar \textit{ground truth}, aprendizaje ni herramientas de evaluación experimental.
+	
+	\item Desarrollar \textbf{Praeco Análisis} como una tercera aplicación independiente destinada al tratamiento de los resultados experimentales generados por Praeco Desarrollo. Esta aplicación permite seleccionar el fichero de experimentos y realizar el análisis estadístico de las métricas CER y WER, la mejora producida por el corrector, los tiempos de procesamiento, las variables de calidad de imagen, los casos de mejora y empeoramiento y la separación entre experimentos de aprendizaje y validación.
+	
+	\item Evaluar objetivamente el funcionamiento del sistema mediante las métricas \textit{Character Error Rate} (CER) y \textit{Word Error Rate} (WER), comparando el texto producido originalmente por el OCR con el obtenido después de aplicar el corrector de Praeco.
+	
+	\item Analizar el coste computacional de las principales etapas del procesamiento mediante el registro de los tiempos de captura, reconocimiento OCR, corrección y detección de alérgenos, permitiendo estudiar la viabilidad del sistema para su utilización interactiva en un dispositivo móvil.
+	
+	\item Establecer una metodología experimental que mantenga separados los procesos de aprendizaje y validación. Una vez estabilizados el código y los recursos lingüísticos, estos se congelan para realizar una validación independiente, evitando que los datos empleados durante el aprendizaje condicionen los resultados finales.
+	
+	\item Diseñar una interfaz sencilla y accesible, orientada a reducir la dependencia de elementos exclusivamente visuales y favorecer la interacción mediante información auditiva.
+	
+\end{itemize}
+
+La arquitectura resultante establece, por tanto, una separación funcional entre las tres aplicaciones. \textbf{Praeco Desarrollo} permite construir, aprender y evaluar el sistema; \textbf{Praeco Usuario} constituye el asistente operativo destinado al usuario final utilizando recursos previamente validados; y \textbf{Praeco Análisis} proporciona las herramientas necesarias para estudiar estadísticamente los resultados experimentales. Esta división facilita la trazabilidad del proceso de desarrollo y permite realizar una evaluación metodológicamente independiente del sistema antes de transferir los recursos validados a la aplicación de usuario.

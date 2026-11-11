@@ -1,0 +1,518 @@
+% ------------------------------------------
+% Tema 3 Materiales y Métodos 
+% ------------------------------------------
+
+\chapter{Materiales y métodos}
+
+\section{Arquitectura de la aplicación y funcionamiento detallado de Praeco}
+
+Praeco es un asistente accesible para dispositivos Android orientado a personas con discapacidad visual o baja visión. Su objetivo es utilizar la cámara del teléfono y técnicas de visión artificial para reconocer el texto presente en el etiquetado de productos, corregir de forma conservadora determinados errores producidos durante el reconocimiento OCR, identificar posibles alérgenos y comunicar el resultado mediante síntesis de voz.
+
+En la arquitectura actual se distinguen tres aplicaciones: \textbf{Praeco Desarrollo}, utilizada para la experimentación, aprendizaje, trazabilidad y evaluación; \textbf{Praeco Usuario}, que constituye la aplicación operativa final con los recursos aprendidos congelados; y \textbf{Praeco Análisis}, destinada al tratamiento estadístico de los resultados almacenados por la versión de Desarrollo.
+
+\begin{figure}[htbp]
+	\centering
+	\resizebox{0.98\textwidth}{!}{%
+		\begin{tikzpicture}[
+			box/.style={
+				draw,
+				rounded corners,
+				align=center,
+				minimum width=4.1cm,
+				minimum height=1.15cm,
+				font=\small
+			},
+			line/.style={
+				-{Latex[length=2.5mm]},
+				thick
+			}
+			]
+			
+			% Nodo principal
+			\node[box] (eco) {ECOSISTEMA PRAECO};
+			
+			% Tres aplicaciones
+			\node[
+			box,
+			below left=2.0cm and 5.5cm of eco
+			] (dev) {
+				PRAECO DESARROLLO\\
+				Captura, OCR, corrección\\
+				alérgenos, TTS, aprendizaje\\
+				CER/WER y trazabilidad
+			};
+			
+			\node[
+			box,
+			below=2.0cm of eco
+			] (usr) {
+				PRAECO USUARIO\\
+				Captura, OCR, corrección\\
+				alérgenos y TTS\\
+				sin aprendizaje ni evaluación
+			};
+			
+			\node[
+			box,
+			below right=2.0cm and 5.5cm of eco
+			] (ana) {
+				PRAECO ANÁLISIS\\
+				Lectura de experimentos\\
+				estadísticas y comparación\\
+				de resultados
+			};
+			
+			% Flechas separadas
+			\draw[line]
+			(eco.south west) -- (dev.north);
+			
+			\draw[line]
+			(eco.south) -- (usr.north);
+			
+			\draw[line]
+			(eco.south east) -- (ana.north);
+			
+			% Comunicación Desarrollo -> Análisis
+			\draw[line]
+			(dev.south) -- ++(0,-1.0cm)
+			-| node[
+			pos=0.5,
+			below,
+			font=\scriptsize
+			] {\texttt{experimentos.csv}}
+			(ana.south);
+			
+		\end{tikzpicture}%
+	}
+	
+	\caption{Arquitectura general del ecosistema Praeco.}
+	\label{fig:ecosistema-praeco}
+\end{figure}
+
+Como se muestra en la Figura~\ref{fig:ecosistema-praeco}, el ecosistema se divide en tres aplicaciones con responsabilidades diferenciadas. Esta separación resulta importante metodológicamente: Praeco Desarrollo permite desarrollar, aprender y evaluar el sistema; Praeco Usuario representa la aplicación destinada al uso normal; y Praeco Análisis estudia experimentalmente los resultados obtenidos.
+
+\subsection{Flujo general de procesamiento}
+
+El funcionamiento principal de Praeco sigue una cadena secuencial: adquisición de la imagen, selección de la región de interés, evaluación de calidad, reconocimiento OCR, filtrado, reconstrucción y protección de tokens, corrección léxica, detección de alérgenos y síntesis de voz.
+
+\begin{figure}[htbp]
+\centering
+\resizebox{0.93\textwidth}{!}{%
+\begin{tikzpicture}[node distance=0.43cm,
+ box/.style={draw,rounded corners,align=center,minimum width=6.4cm,minimum height=0.64cm,font=\small},
+ line/.style={-{Latex[length=2mm]},thick}]
+ \node[box] (cam) {Cámara: análisis de fotogramas en vista previa};
+ \node[box,below=of cam] (luz) {Brillo inferior a 150: linterna continua y estabilización};
+ \node[box,below=of luz] (cal) {Evaluación de nitidez, brillo y contraste};
+ \node[box,below=of cal] (cap) {Captura automática de una fotografía y recorte ROI};
+ \node[box,below=of cap] (mej) {Mejora condicional: CLAHE o ajuste de iluminación};
+ \node[box,below=of mej] (sel) {OCR original / OCR procesado cuando procede; selección};
+ \node[box,below=of sel] (fil) {Filtrado y reconstrucción de tokens};
+ \node[box,below=of fil] (cor) {Corrección léxica conservadora};
+ \node[box,below=of cor] (out) {Detección de alérgenos y síntesis de voz};
+ \foreach \a/\b in {cam/luz,luz/cal,cal/cap,cap/mej,mej/sel,sel/fil,fil/cor,cor/out}{\draw[line] (\a)--(\b);}
+\end{tikzpicture}}
+\caption{Flujo de captura rápida y preprocesamiento condicional de Praeco. La captura se realiza al cumplir los criterios de calidad; la linterna permanece encendida hasta finalizarla cuando es necesaria.}
+\label{fig:flujo-principal-praeco}
+\end{figure}
+
+La Figura~\ref{fig:flujo-principal-praeco} resume el flujo de procesamiento desde la captura hasta la obtención y comunicación del resultado.
+
+\subsection{Adquisición de la imagen y región de interés}
+
+El procesamiento comienza con la cámara del teléfono móvil. La cámara proporciona imágenes de la etiqueta situada delante del dispositivo. El objetivo no es únicamente tomar una fotografía, sino obtener una captura que presente condiciones suficientemente buenas para realizar posteriormente el reconocimiento OCR.
+
+En la versión optimizada, Praeco analiza fotogramas de la vista previa antes de efectuar una única fotografía. La decisión automática se basa en la estabilidad de la imagen y en estimaciones de nitidez, brillo y contraste. Se evita así adquirir y reconocer mediante OCR tres fotografías sucesivas para escoger una de ellas, operación que aumentaba la latencia. Cuando la imagen no reúne los criterios establecidos, la aplicación continúa evaluando la vista previa hasta obtener condiciones apropiadas.
+
+Una vez realizada la captura, Praeco recorta una \textit{Region of Interest} (ROI), que delimita la zona de la imagen que interesa procesar. En la implementación se conserva todo el ancho y aproximadamente los dos tercios superiores de la imagen. Esta reducción permite limitar la presencia de fondo y de elementos que no pertenecen al etiquetado, al mismo tiempo que disminuye el volumen de información que debe procesarse.
+
+La imagen correspondiente a la ROI constituye la entrada del motor OCR. Se conserva una copia original y, cuando las condiciones lo requieren, se genera otra con mejora de imagen. El reconocimiento se aplica inicialmente a la imagen original y puede compararse con el de la procesada, seleccionando la alternativa mediante los criterios de puntuación programados.
+
+\subsection{Evaluación de la calidad de imagen}
+
+Antes de aceptar una captura, Praeco analiza tres propiedades principales: \textbf{nitidez}, \textbf{brillo} y \textbf{contraste}. La nitidez permite estimar si la fotografía está correctamente enfocada y se calcula mediante la varianza de la respuesta de un operador Laplaciano. El brillo representa el nivel medio de luminancia, mientras que el contraste representa la dispersión de los niveles de luminancia.
+
+La luminancia se aproxima mediante
+\begin{equation}
+	L=0{,}299R+0{,}587G+0{,}114B.
+\end{equation}
+
+\begin{figure}[htbp]
+	\centering
+	\resizebox{0.98\textwidth}{!}{%
+		\begin{tikzpicture}[node distance=1cm and 1cm,
+			box/.style={draw, rounded corners, align=center, minimum width=3.1cm, minimum height=0.8cm, font=\small},
+			line/.style={-{Latex[length=2mm]}, thick}]
+			\node[box] (img) {Imagen ROI};
+			\node[box, below left=1cm and 2.6cm of img] (nit) {Nitidez\\Varianza Laplaciana};
+			\node[box, below=1cm of img] (bri) {Brillo\\Luminancia media};
+			\node[box, below right=1cm and 2.6cm of img] (con) {Contraste\\Desviación típica};
+			\node[box, below=2.5cm of img] (eval) {Evaluación de calidad};
+			\node[box, below left=1cm and 1.8cm of eval] (repeat) {Repetir};
+			\node[box, below right=1cm and 1.8cm of eval] (accept) {Aceptar};
+			\draw[line](img)--(nit); \draw[line](img)--(bri); \draw[line](img)--(con);
+			\draw[line](nit)--(eval); \draw[line](bri)--(eval); \draw[line](con)--(eval);
+			\draw[line](eval)--(repeat); \draw[line](eval)--(accept);
+		\end{tikzpicture}%
+	}
+	\caption{Evaluación de calidad de la imagen.}
+	\label{fig:calidad-praeco}
+\end{figure}
+
+La Figura~\ref{fig:calidad-praeco} representa las variables utilizadas para decidir si la imagen presenta unas condiciones mínimas de calidad. Los umbrales básicos de aceptación son nitidez mínima 100, contraste mínimo 20, brillo mínimo 35 y brillo máximo 225. Estos umbrales de aceptación se distinguen del umbral de activación de la linterna (brillo inferior a 150) y del criterio de CLAHE (contraste inferior a 25). Estos valores son parámetros iniciales del prototipo y no deben interpretarse como límites universalmente validados. Una imagen puede superar dichos umbrales y producir un OCR deficiente debido a la perspectiva, curvatura del envase, reflejos, tipografía, tamaño de letra o disposición del texto.
+
+\subsection{Control automático de iluminación y estabilización}
+
+La versión optimizada incorpora control de la iluminación auxiliar a partir de la luminancia estimada en la vista previa. Se ha fijado experimentalmente un umbral de activación de \textbf{150} en la escala de brillo de 0 a 255. Cuando la iluminación es inferior, se solicita al controlador de cámara el modo \texttt{FlashMode.torch}, que proporciona iluminación continua en lugar de un destello sincronizado con la fotografía. Una vez encendida, la linterna permanece activa durante la evaluación y la adquisición, incluso si el brillo aumenta por efecto de la propia luz. Esta retención evita la oscilación encendido--apagado observada durante el desarrollo.
+
+Tras la activación se introduce una espera aproximada de \textbf{900~ms} para permitir la estabilización de la exposición y el enfoque. Finalizada la captura, se apaga la linterna. El umbral de 150 y el tiempo de espera son parámetros de ingeniería ajustados durante las pruebas del prototipo, no constantes óptimas universales: pueden depender de la cámara, la distancia y la reflectancia del envase.
+
+\subsection{Preprocesamiento condicional mediante CLAHE}
+
+Se ha añadido un módulo opcional de mejora de imagen previo al OCR. Su objetivo es actuar únicamente cuando la calidad de la captura lo justifique, conservando la imagen original como referencia. En particular, si el contraste medido es inferior a un umbral operativo de \textbf{25}, se puede aplicar \textit{Contrast Limited Adaptive Histogram Equalization} (CLAHE), una ecualización adaptativa del histograma limitada para reducir la amplificación excesiva del ruido.
+
+El procedimiento divide la imagen en regiones locales, calcula sus histogramas de luminancia, limita las frecuencias excesivas y redistribuye los valores de intensidad; la interpolación entre regiones reduce las discontinuidades de contraste. Si el problema dominante es la iluminación, se contempla un ajuste de brillo. Cuando la imagen ya presenta condiciones suficientes, no se aplica mejora adicional. CLAHE no corrige por sí mismo el desenfoque ni garantiza una disminución del error OCR.
+
+La interfaz de resultados presenta la fotografía original y, cuando se ha generado, la procesada, junto con la indicación del tratamiento utilizado (CLAHE, ajuste de iluminación o ninguno) y la procedencia de la imagen elegida para el reconocimiento. Esta comparación visual permite comprobar el efecto de la mejora sin confundirlo con una ganancia de precisión demostrada.
+
+La selección entre resultados OCR se efectúa mediante la puntuación prevista en la implementación y no mediante el \textit{ground truth}, que se reserva para la evaluación experimental. La incorporación de CLAHE debe evaluarse mediante un ensayo de ablación con imágenes idénticas y los mismos recursos lingüísticos congelados.
+
+\subsection{Reconocimiento OCR mediante Google ML Kit}
+
+Una vez aceptada la imagen, se procesa mediante \texttt{TextRecognizer} de Google ML Kit. La salida inicial constituye el \textbf{OCR bruto}. Esta salida puede contener sustituciones de caracteres visualmente parecidos, errores de separación, puntuación o reconocimiento de palabras. Por ello, ML Kit constituye la primera etapa del reconocimiento textual, pero no el resultado definitivo utilizado por Praeco.
+
+\subsection{Filtrado del OCR}
+
+El texto bruto pasa por una etapa de filtrado cuyo objetivo es eliminar información que no resulta útil para el análisis y reducir la interferencia de determinados elementos comerciales o auxiliares. El filtro trabaja por líneas y puede descartar URL, cadenas exclusivamente numéricas, determinados códigos largos, identificadores de lote, cantidades aisladas con unidades y ciertas expresiones de reciclaje. Las líneas que contienen información textual útil se conservan para las etapas posteriores.
+
+Debe distinguirse entre \textbf{OCR bruto}, \textbf{OCR filtrado} y \textbf{texto corregido}. El primero es la salida directa del motor OCR; el segundo es el resultado de aplicar las reglas de limpieza; y el tercero incorpora el postprocesamiento léxico de Praeco.
+
+\subsection{Reconstrucción y protección de tokens}
+
+Tras el filtrado, el texto se representa como una secuencia de palabras o \textit{tokens}. Esta representación permite analizar cada palabra antes de decidir si debe mantenerse o corregirse. Praeco incorpora además mecanismos para reconstruir determinadas separaciones o uniones anómalas producidas por el OCR.
+
+Uno de los principios del corrector es que una palabra desconocida no debe corregirse automáticamente. Antes de aplicar una corrección se comprueba si el token pertenece a alguna categoría protegida: números y cantidades, palabras muy cortas, \textit{stopwords}, vocabulario presente en el diccionario base o adaptativo, determinados términos ingleses y nombres propios explícitamente protegidos.
+
+Esta protección es especialmente relevante en etiquetas multilingües. Por ejemplo, la palabra italiana \textit{bianco} puede aparecer realmente en una etiqueta y, si forma parte del vocabulario válido aprendido, debe conservarse. El objetivo del corrector no es traducir ni castellanizar el etiquetado, sino corregir errores atribuibles al OCR.
+
+\subsection{Corrector léxico híbrido}
+
+Cuando un token no está protegido, Praeco genera candidatos a partir del diccionario base, del diccionario adaptativo y de los recursos léxicos disponibles. Cada candidato se evalúa combinando distancia de edición, semejanza fonética y diferencia de longitud. Si el mejor candidato no alcanza una confianza suficiente o existe ambigüedad entre candidatos, se conserva la palabra original.
+
+\begin{figure}[htbp]
+	\centering
+	\resizebox{0.98\textwidth}{!}{%
+		\begin{tikzpicture}[node distance=0.65cm,
+			box/.style={draw, rounded corners, align=center, minimum width=5.6cm, minimum height=0.75cm, font=\small},
+			line/.style={-{Latex[length=2.2mm]}, thick}]
+			\node[box] (tok) {Token OCR no protegido};
+			\node[box, below=of tok] (cand) {Generación de candidatos: diccionario base, adaptativo y léxico};
+			\node[box, below=of cand] (score) {Puntuación: Levenshtein + fonética + diferencia de longitud};
+			\node[box, below=of score] (conf) {Evaluación de umbral, distancia relativa y ambigüedad};
+			\node[box, below left=1.7cm and 0.2cm of conf] (keep) {Conservar original};
+			\node[box, below right=1.7cm and 0.2cm of conf] (corr) {Aceptar corrección};
+			\draw[line](tok)--(cand); \draw[line](cand)--(score); \draw[line](score)--(conf);
+			\draw[line](conf)--(keep); \draw[line](conf)--(corr);
+		\end{tikzpicture}%
+	}
+	\caption{Proceso de decisión del corrector léxico de Praeco.}
+	\label{fig:corrector-praeco}
+\end{figure}
+
+La lógica general de decisión del corrector se sintetiza en la Figura~\ref{fig:corrector-praeco}.
+
+\subsection{Distancia de Levenshtein}
+
+La Distancia de Levenshtein es uno de los algoritmos más utilizados en procesamiento del lenguaje natural (NLP), corrección ortográfica y sistemas OCR para medir la similitud entre dos palabras. 
+
+La distancia de Levenshtein mide el número mínimo de operaciones necesarias para transformar una cadena en otra mediante inserciones, eliminaciones y sustituciones. Por ejemplo, transformar \texttt{lechf} en \texttt{leche} requiere una sustitución, por lo que su distancia es uno. Una distancia pequeña indica elevada similitud ortográfica, pero Praeco no utiliza este valor de forma aislada: se combina con otros criterios para evitar correcciones agresivas.
+
+Los límites de distancia dependen de la longitud de la palabra: para tokens de longitud menor o igual que cinco se admite como máximo una distancia ponderada de 1; hasta ocho caracteres, 2; y para longitudes superiores, 3. Además se aplica un límite relativo y criterios de confianza y separación entre candidatos.
+
+\subsection{Información fonética}
+
+La semejanza fonética complementa la semejanza ortográfica. La función de fonetización agrupa algunas grafías potencialmente confundibles y permite penalizar candidatos que, aunque sean próximos gráficamente, resulten menos plausibles desde el punto de vista fonético. La decisión final combina ambas fuentes de información con la diferencia de longitud.
+
+\subsection{Diccionario adaptativo y aprendizaje incremental}
+
+Praeco Desarrollo incorpora un mecanismo de aprendizaje basado en dos recursos diferentes. El fichero \texttt{errores\_ocr.json} registra asociaciones observadas entre formas reconocidas erróneamente y palabras correctas, junto con su frecuencia y estado. El fichero \texttt{diccionario\_adaptativo.json}, en cambio, contiene vocabulario válido aprendido y no una tabla de errores.
+
+Cuando el modo de aprendizaje está activo, el texto OCR se alinea con el texto real o \textit{ground truth}. Las asociaciones próximas se registran y aumentan su frecuencia cuando vuelven a observarse. Las asociaciones suficientemente repetidas, válidas y no conflictivas pueden integrarse en el diccionario adaptativo. En la implementación actual, la integración exige una frecuencia mínima de tres observaciones.
+
+\medskip
+
+\begin{figure}[htbp]
+	\centering
+	\resizebox{0.72\textwidth}{!}{%
+		\begin{tikzpicture}[node distance=0.6cm,
+			box/.style={draw, rounded corners, align=center, minimum width=5.5cm, minimum height=0.20cm, font=\small},
+			line/.style={-{Latex[length=1.2mm]}, thick}]
+			\node[box] (ocr) {OCR original + texto real (ground truth)};
+			\node[box, below=of ocr] (ali) {Alineación y comparación de palabras};
+			\node[box, below=of ali] (err) {Registro de asociación en \texttt{errores\_ocr.json}};
+			\node[box, below=of err] (freq) {Incremento de frecuencia y control de conflictos};
+			\node[box, below=of freq] (dic) {Integración de palabra válida en \texttt{diccionario\_adaptativo.json}};
+			\draw[line](ocr)--(ali); \draw[line](ali)--(err); \draw[line](err)--(freq); \draw[line](freq)--(dic);
+		\end{tikzpicture}%
+	}
+	\caption{Esquema del aprendizaje incremental de Praeco Desarrollo.}
+	\label{fig:aprendizaje-praeco}
+\end{figure}
+
+La Figura~\ref{fig:aprendizaje-praeco} muestra la secuencia seguida durante el aprendizaje incremental, desde la comparación con el texto de referencia hasta la posible incorporación de vocabulario validado.
+
+\medskip
+
+Por ejemplo, si el OCR produce repetidamente \textit{biarico} mientras el texto real contiene \textit{bianco}, la asociación puede registrarse como error. En cambio, \textit{bianco} puede incorporarse al diccionario adaptativo como palabra válida. De esta forma, el sistema aprende vocabulario del dominio sin considerar erróneas palabras extranjeras que realmente aparecen en el etiquetado.
+
+\subsection{Corrección contextual mediante n-gramas}
+
+El proyecto dispone de recursos de unigramas, bigramas, trigramas y cuatrigramas relacionados con el dominio alimentario. Estos recursos permiten representar secuencias frecuentes como \textit{aceite de}, \textit{harina de}, \textit{puede contener} o \textit{trazas de}. El contexto puede reforzar una corrección que resulte coherente con las palabras vecinas.
+
+No obstante, en la validación congelada utilizada para los resultados finales debe indicarse expresamente si la llamada a la corrección contextual está activa o desactivada. Cuando se encuentra desactivada, los resultados corresponden al OCR y al corrector léxico activo y no constituyen una evaluación de la corrección contextual por n-gramas.
+
+\subsection{Detección de alérgenos}
+
+El texto corregido se utiliza como entrada del detector de alérgenos. La implementación contempla las categorías gluten, lácteos, huevo, frutos secos, cacahuete, soja, pescado y marisco mediante un conjunto de términos configurados para cada una de ellas. El sistema analiza la presencia de estos términos en el texto reconocido y, cuando identifica una coincidencia positiva, genera un aviso del tipo \textit{«Atención: contiene ...»}.
+
+Para reducir la aparición de falsos positivos, Praeco no considera únicamente la presencia aislada del nombre de un alérgeno, sino que tiene en cuenta determinadas expresiones que indican explícitamente su ausencia. De este modo, una aparición de la palabra \textit{gluten} no implica necesariamente que el producto contenga gluten. Si el texto reconocido contiene expresiones como \textit{«sin gluten»}, \textit{«libre de gluten»} o construcciones equivalentes contempladas por las reglas implementadas, el sistema interpreta que dicha mención corresponde a una declaración de ausencia y evita generar una alerta positiva para ese alérgeno. El mismo criterio puede aplicarse a otras categorías cuando aparecen asociadas a expresiones de exclusión reconocidas por el sistema.
+
+Por tanto, el proceso de detección puede representarse mediante dos niveles de comprobación. En primer lugar, se localizan los términos asociados a las distintas categorías de alérgenos y, posteriormente, se comprueba si la aparición se encuentra dentro de una expresión de exclusión. Si existe una coincidencia positiva y no está afectada por una regla de ausencia, Praeco genera el mensaje \textit{«Atención: contiene ...»}. Si no se detectan términos configurados como alérgenos, o las apariciones encontradas corresponden únicamente a expresiones explícitas de ausencia reconocidas por el sistema, se informa mediante el mensaje \textit{«No se detectan alérgenos»}.
+
+Este tratamiento resulta especialmente importante en el etiquetado alimentario, ya que expresiones como \textit{«sin gluten»} contienen literalmente el término que identifica al alérgeno. Una búsqueda basada exclusivamente en palabras clave produciría en este caso un falso positivo. La comprobación de expresiones de ausencia permite a Praeco distinguir, dentro de las reglas implementadas, entre una mención positiva y una declaración explícita de exclusión.
+
+No obstante, este mecanismo constituye una ayuda experimental basada en coincidencias léxicas y reglas de contexto local, y no un análisis semántico, nutricional o clínico completo. La expresión \textit{«No se detectan alérgenos»} significa únicamente que, a partir del texto reconocido por el OCR y de las reglas y categorías configuradas en Praeco, no se ha identificado una presencia positiva de los alérgenos considerados. Por ello, este resultado no certifica que el producto esté libre de alérgenos y no debe utilizarse como única fuente para decidir su consumo.
+
+\subsection{Síntesis de voz}
+
+La accesibilidad se completa mediante \textit{Text-to-Speech} (TTS). El texto corregido y los avisos generados se transforman en voz, permitiendo utilizar la aplicación sin depender exclusivamente de la lectura visual de la pantalla. La configuración principal utiliza el idioma \texttt{es-ES}.
+
+La velocidad de reproducción de la síntesis de voz es un parámetro configurable mediante software, lo que permite adaptar el ritmo de lectura a las necesidades y preferencias del usuario. De esta forma, la aplicación puede proporcionar una locución más lenta para facilitar la comprensión o, alternativamente, aumentar la velocidad para usuarios habituados al uso de lectores de pantalla y sistemas de asistencia por voz. Esta posibilidad de configuración contribuye a mejorar la accesibilidad y flexibilidad del sistema, al permitir personalizar la presentación auditiva de la información. La velocidad programada por defecto es 0,5.
+
+\subsection{Evaluación mediante ground truth, CER y WER}
+
+\textbf{Esta funcionalidad está presente solo en Praeco Desarrollo.}
+
+ Durante los experimentos, el usuario introduce el texto real de la etiqueta, que actúa como \textit{ground truth}. La referencia se compara tanto con el OCR original como con el texto corregido.
+
+El \textit{Character Error Rate} (CER) cuantifica el error a nivel de caracteres:
+\begin{equation}
+	CER=\frac{S+D+I}{N},
+\end{equation}
+donde $S$ representa sustituciones, $D$ eliminaciones, $I$ inserciones y $N$ el número de caracteres de la referencia.
+
+\medskip
+
+El \textit{Word Error Rate} (WER) utiliza la misma expresión a nivel de palabras:
+\begin{equation}
+	WER=\frac{S+D+I}{N},
+\end{equation}
+donde $N$ representa ahora el número de palabras de la referencia. La comparación de \texttt{cer\_ocr} frente a \texttt{cer\_corregido} y de \texttt{wer\_ocr} frente a \texttt{wer\_corregido} permite determinar objetivamente si el corrector mejora, mantiene o empeora el reconocimiento.
+
+\subsection{Medición temporal}
+
+Praeco Desarrollo instrumenta las principales fases del procesamiento mediante temporizadores. Se registran el tiempo de captura $t_{captura}$, el tiempo OCR $t_{OCR}$, el tiempo de corrección $t_{correccion}$ y el tiempo de detección de alérgenos $t_{alergenos}$. El tiempo total analizado puede obtenerse como
+\begin{equation}
+	t_{total}=t_{captura}+t_{OCR}+t_{correccion}+t_{alergenos}.
+\end{equation}
+
+En la versión de captura rápida, la medida de captura debe interpretarse de acuerdo con los puntos de inicio y fin del temporizador: no necesariamente incluye todas las operaciones posteriores de decodificación, recorte y mejora de imagen. Para comparar versiones se recomienda registrar además la latencia completa desde la activación hasta el resultado. Estas medidas permiten evaluar no solo la precisión, sino también el coste computacional y la viabilidad del procesamiento en tiempo real.
+
+\subsection{Almacenamiento experimental}
+
+Praeco Desarrollo crea y en caso de existir actualiza un fichero canónico denominado \texttt{experimentos.csv}. El registro de referencia utilizado para la validación histórica contiene 21 campos:
+
+\begin{center}
+	\renewcommand{\arraystretch}{1.3}
+	\setlength{\tabcolsep}{12pt}
+	\begin{tabular}{lll}
+		1. \texttt{fecha}              & 2. \texttt{imagen}              & 3. \texttt{texto\_real} \\
+		4. \texttt{ocr}                & 5. \texttt{ocr\_corregido}      & 6. \texttt{cer\_ocr} \\
+		7. \texttt{cer\_corregido}     & 8. \texttt{wer\_ocr}            & 9. \texttt{wer\_corregido} \\
+		10. \texttt{ancho}             & 11. \texttt{alto}               & 12. \texttt{nitidez} \\
+		13. \texttt{brillo}            & 14. \texttt{contraste}          & 15. \texttt{calidad\_aceptable} \\
+		16. \texttt{decision\_calidad} & 17. \texttt{t\_captura}         & 18. \texttt{t\_ocr} \\
+		19. \texttt{t\_correccion}     & 20. \texttt{t\_alergenos}       & 21. \texttt{modo\_aprendizaje} \\
+	\end{tabular}
+\end{center}
+
+La instrumentación futura del control de iluminación y del preprocesamiento puede ampliar este esquema con los campos \texttt{brillo\_previo}, \texttt{linterna\_activada}, \texttt{tiempo\_estabilizacion\_ms} y \texttt{mejora\_imagen}. No se presupone que estén presentes en el CSV histórico. Además de este fichero CSV, la versión de Desarrollo conserva información de trazabilidad y recursos de aprendizaje. El campo \texttt{modo\_aprendizaje} permite distinguir las ejecuciones realizadas durante el aprendizaje de aquellas efectuadas con los recursos congelados para validación.
+
+\subsection{Praeco Análisis}
+
+Praeco Análisis constituye una aplicación independiente destinada a procesar el fichero \texttt{experimentos.csv}. El usuario selecciona la ubicación del fichero de experimentos y la aplicación calcula estadísticas globales, compara CER y WER antes y después de la corrección, analiza tiempos de ejecución y permite estudiar las variables de calidad. Esta separación evita incorporar herramientas experimentales innecesarias en la aplicación destinada al usuario final.
+
+\begin{figure}[htbp]
+	\centering
+	\resizebox{0.98\textwidth}{!}{%
+		\begin{tikzpicture}[node distance=0.75cm,
+			box/.style={draw, rounded corners, align=center, minimum width=5.2cm, minimum height=0.8cm, font=\small},
+			line/.style={-{Latex[length=2.2mm]}, thick}]
+			\node[box] (dev) {Praeco Desarrollo};
+			\node[box, below=of dev] (csv) {\texttt{experimentos.csv}};
+			\node[box, below=of csv] (ana) {Praeco Análisis};
+			\node[box, below left=0.8cm and 2.2cm of ana] (cer) {CER / WER};
+			\node[box, below=0.8cm of ana] (tim) {Tiempos};
+			\node[box, below right=0.8cm and 2.2cm of ana] (qua) {Calidad};
+			\node[box, below=2.6cm of ana] (res) {Estadísticas y resultados del TFM};
+			\draw[line](dev)--(csv); \draw[line](csv)--(ana); \draw[line](ana)--(cer); \draw[line](ana)--(tim); \draw[line](ana)--(qua);
+			\draw[line](cer)--(res); \draw[line](tim)--(res); \draw[line](qua)--(res);
+		\end{tikzpicture}%
+	}
+	\caption{Relación entre Praeco Desarrollo y Praeco Análisis.}
+	\label{fig:praeco-analisis}
+\end{figure}
+
+La relación entre la aplicación que genera los datos experimentales y la herramienta que los analiza se resume en la Figura~\ref{fig:praeco-analisis}.
+
+\newpage
+
+\subsection{Separación entre Praeco Desarrollo y Praeco Usuario}
+
+La separación entre ambas versiones es fundamental para la metodología experimental. Praeco Desarrollo incorpora \textit{ground truth}, cálculo de CER/WER, aprendizaje, almacenamiento experimental y trazabilidad. Praeco Usuario conserva únicamente las funciones necesarias para el uso normal: cámara, control de calidad, OCR, filtrado, corrección con recursos congelados, detección de alérgenos y TTS.
+
+El procedimiento metodológico consiste en aprender y depurar los recursos en Desarrollo, auditar el \textit{ground truth}, congelar el código y los recursos de aprendizaje, realizar la validación independiente y transferir el diccionario adaptativo validado a la aplicación de Usuario. De este modo, los resultados de aprendizaje no se mezclan con los resultados de validación final.
+
+\begin{figure}[htbp]
+	\centering
+	\resizebox{0.98\textwidth}{!}{%
+		\begin{tikzpicture}[node distance=1cm and 1.3cm,
+			box/.style={draw, rounded corners, align=left, text width=6.1cm, minimum height=4.0cm, font=\small},
+			line/.style={-{Latex[length=2.2mm]}, thick}]
+			\node[box] (dev) {\textbf{PRAECO DESARROLLO}\\[2mm]
+				Cámara y calidad\\OCR y filtrado\\Corrección y alérgenos\\TTS\\Ground truth y CER/WER\\Aprendizaje y trazabilidad\\\texttt{experimentos.csv}};
+			\node[box, right=of dev] (usr) {\textbf{PRAECO USUARIO}\\[2mm]
+				Cámara y calidad\\OCR y filtrado\\Corrección con recursos congelados\\Alérgenos\\TTS\\\textcolor{red}{Sin ground truth}\\\textcolor{red}{Sin aprendizaje ni evaluación}};
+			\draw[line] (dev) -- node[above, align=center, font=\scriptsize]{recursos\\congelados} (usr);
+		\end{tikzpicture}%
+	}
+	\caption{Separación funcional entre Praeco Desarrollo y Praeco Usuario.}
+	\label{fig:desarrollo-usuario}
+\end{figure}
+
+La Figura~\ref{fig:desarrollo-usuario} destaca la separación entre las funciones experimentales de Praeco Desarrollo y la versión destinada al uso normal. En conjunto, Praeco implementa la secuencia \textbf{adquisición de una imagen de calidad $\rightarrow$ reconocimiento OCR $\rightarrow$ filtrado y reconstrucción $\rightarrow$ corrección híbrida $\rightarrow$ detección de alérgenos $\rightarrow$ comunicación accesible mediante voz}. La versión de Desarrollo añade paralelamente aprendizaje, trazabilidad y evaluación cuantitativa mediante CER, WER y tiempos de procesamiento.
+
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\section{Tecnologías y Dependencias Utilizadas}
+Las principales bibliotecas y herramientas empleadas son:
+\begin{itemize}
+	\item \textbf{Flutter}: Framework de UI para el desarrollo de aplicaciones móviles multiplataforma.
+	\item \textbf{camera}: Plugin de Flutter para acceder y controlar la cámara del dispositivo.
+	\item \textbf{google\_mlkit\_text\_recognition}: Parte de Google ML Kit, utilizada para realizar el reconocimiento óptico de caracteres en las imágenes capturadas.
+	\item \textbf{flutter\_tts}: Plugin de Flutter para la funcionalidad de texto a voz (\textit{Text-to-Speech}), permitiendo a la aplicación vocalizar el texto reconocido y corregido.
+	\item \textbf{image (package image)}: Biblioteca para el procesamiento de imágenes en Dart, utilizada para recortar las imágenes antes de pasarlas al motor OCR.
+	\item \textbf{path\_provider}: Plugin para obtener rutas a directorios comúnmente utilizados en el sistema de archivos.
+	\item \textbf{permission\_handler}: Plugin para gestionar los permisos de la aplicación, como el acceso al almacenamiento.
+	\item \textbf{google\_mlkit\_language\_id}: Parte de Google ML Kit, utilizada para identificar el idioma del texto detectado y filtrar contenido no relevante.
+\end{itemize}
+
+% ------------------------------------------------
+% JUSTIFICACION DE LA ELECION DE FLUTTER Y DART
+% ------------------------------------------------
+
+\section{Justificación de la elección de Flutter y Dart}
+
+Uno de los aspectos fundamentales durante el desarrollo del sistema fue la selección de las tecnologías software más adecuadas para implementar un asistente inteligente accesible y multiplataforma.
+
+Tras analizar diversas alternativas, se decidió utilizar Flutter junto al lenguaje Dart como base principal del desarrollo.
+
+\begin{itemize}
+	
+	\item\textbf{Motivo de la elección.} La elección de Flutter se fundamenta principalmente en los siguientes aspectos:
+	\begin{itemize}[noitemsep]
+		\item Desarrollo multiplataforma mediante un único código fuente.
+		\item Alto rendimiento en dispositivos móviles.
+		\item Integración sencilla con librerías de visión artificial y OCR.
+		\item Excelente compatibilidad con Android.
+		\item Interfaz gráfica moderna y accesible.
+		\item Gran ecosistema de paquetes y librerías.
+		\item Rapidez de desarrollo y mantenimiento.
+	\end{itemize}
+\end{itemize}
+
+Flutter permite generar aplicaciones nativas con un rendimiento cercano al desarrollo específico para Android o iOS, reduciendo considerablemente el tiempo de implementación y facilitando futuras ampliaciones del sistema.
+
+\begin{itemize}
+	\item\textbf{Comparación con otras tecnologías.} Durante la fase de diseño se analizaron otras alternativas tecnológicas ampliamente utilizadas en el desarrollo móvil:
+	\begin{itemize}[noitemsep]
+		\item Android Studio (Java/Kotlin).
+		\item React Native.
+		\item Xamarin.
+		\item Desarrollo web híbrido.
+	\end{itemize}
+\end{itemize}
+
+\begin{itemize}
+	\item \textbf{Android Studio con Java o Kotlin.} El desarrollo nativo en Android Studio proporciona un excelente rendimiento y acceso directo al hardware del dispositivo. Sin embargo, presenta diversos inconvenientes para este proyecto:
+	
+	\begin{itemize}[noitemsep]
+		\item Mayor complejidad de desarrollo.
+		\item Código más extenso.
+		\item Menor velocidad de prototipado.
+		\item Dificultad para mantener versiones multiplataforma.
+	\end{itemize}
+\end{itemize}
+Flutter permitió implementar funcionalidades complejas de visión artificial y accesibilidad utilizando una arquitectura considerablemente más compacta y mantenible.
+
+\begin{itemize}
+	\item \textbf{React Native} constituye otra alternativa multiplataforma ampliamente utilizada. No obstante, se descartó debido a:
+	
+	\begin{itemize}[noitemsep]
+		\item Menor rendimiento gráfico en tiempo real.
+		\item Dependencia elevada de puentes nativos.
+		\item Integración más compleja con procesamiento de cámara y OCR.
+		\item Mayor latencia en aplicaciones intensivas de visión artificial.
+	\end{itemize}
+\end{itemize}
+
+Dado que el proyecto requiere captura continua de imagen, procesamiento OCR y síntesis de voz en tiempo real, Flutter ofrecía un comportamiento más estable y eficiente.
+
+\begin{itemize}
+	\item \textbf{Xamarin} proporciona integración con tecnologías Microsoft y desarrollo multiplataforma basado en C\#. Sin embargo, se descartó debido a:
+	
+	\begin{itemize}[noitemsep]
+		\item Menor comunidad activa.
+		\item Menor cantidad de librerías especializadas en IA móvil.
+		\item Mayor complejidad de despliegue.
+		\item Menor documentación orientada a visión artificial móvil.
+	\end{itemize}
+\end{itemize}
+
+\section{Ventajas específicas de Flutter en este proyecto}
+
+Flutter aporta ventajas especialmente relevantes para el desarrollo del asistente inteligente:
+
+\begin{itemize}[noitemsep]
+	\item Integración directa con Google ML Kit.
+	\item Compatibilidad sencilla con Flutter TTS.
+	\item Alto rendimiento en captura de cámara.
+	\item Arquitectura reactiva adecuada para procesamiento asíncrono.
+	\item Interfaz accesible y adaptable.
+	\item Desarrollo rápido de prototipos.
+\end{itemize}
+
+Además, Dart ofrece un sistema moderno de programación asíncrona basado en \texttt{Future} y \texttt{async/await}, especialmente útil para coordinar tareas concurrentes como:
+
+\begin{itemize}[noitemsep]
+	\item Captura de imagen.
+	\item Procesamiento OCR.
+	\item Análisis contextual.
+	\item Síntesis de voz.
+\end{itemize}
+
+\section{Conclusión tecnológica}
+
+La combinación Flutter + Dart resultó especialmente adecuada para el desarrollo del sistema propuesto, proporcionando un equilibrio óptimo entre:
+
+\begin{itemize}[noitemsep]
+	\item Rendimiento.
+	\item Accesibilidad.
+	\item Escalabilidad.
+	\item Facilidad de mantenimiento.
+	\item Integración con inteligencia artificial.
+\end{itemize}
+
+La elección tecnológica permitió implementar un prototipo funcional avanzado con características próximas a asistentes visuales comerciales modernos.
+

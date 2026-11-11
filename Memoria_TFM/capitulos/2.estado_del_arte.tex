@@ -1,0 +1,75 @@
+% ------------------------------------------------
+% ESTADO DEL ARTE
+% ------------------------------------------------
+
+\chapter{Estado del Arte}
+
+La asistencia tecnológica destinada a personas con discapacidad visual ha evolucionado desde dispositivos específicos hacia soluciones basadas en teléfonos móviles, visión artificial y procesamiento local o remoto de la información. El objetivo común de estas tecnologías es aumentar la autonomía del usuario ante tareas cotidianas como la lectura de documentos, la identificación de productos o el acceso a información textual. La literatura sobre tecnología asistencial destaca la importancia de combinar funcionalidad, accesibilidad y facilidad de uso en este tipo de sistemas \cite{assistive}.
+
+En el ámbito del procesamiento de imágenes, las técnicas de visión artificial permiten adquirir, mejorar y analizar imágenes capturadas en condiciones reales \cite{gonzalez,mobilevision}. Sobre esta base, el reconocimiento óptico de caracteres (OCR) transforma el contenido visual en texto susceptible de ser procesado posteriormente. Los motores OCR modernos ofrecen resultados útiles en numerosos escenarios, aunque su precisión continúa dependiendo de factores como el enfoque, la iluminación, el contraste, la perspectiva, el tamaño de los caracteres y la disposición del texto \cite{ocr}.
+
+La corrección posterior al OCR constituye, por tanto, una etapa relevante cuando se trabaja con imágenes no controladas. Entre las técnicas clásicas se encuentra la distancia de Levenshtein, que cuantifica el número mínimo de inserciones, eliminaciones y sustituciones necesarias para transformar una cadena en otra \cite{levenshtein}. Esta medida puede combinarse con información fonética, reglas lingüísticas y modelos de contexto. Los modelos basados en n-gramas permiten representar regularidades locales del lenguaje y constituyen una herramienta habitual dentro del procesamiento del lenguaje natural \cite{nlp}.
+
+Para evaluar cuantitativamente un sistema OCR resulta necesario comparar el texto reconocido con una referencia o \textit{ground truth}. En este trabajo se emplean principalmente el \textit{Character Error Rate} (CER) y el \textit{Word Error Rate} (WER), métricas derivadas de las operaciones de edición necesarias para transformar la hipótesis reconocida en la referencia. Junto con estas métricas de precisión, el tiempo de procesamiento resulta relevante para valorar la viabilidad de una solución interactiva.
+
+% ------------------------------------------------
+\section{Soluciones de asistencia visual}
+% ------------------------------------------------
+
+Existen aplicaciones comerciales que demuestran la utilidad de la visión artificial y el OCR como tecnologías de apoyo. \textit{Seeing AI}, desarrollada por Microsoft, integra funciones destinadas a interpretar información visual y textual para usuarios con discapacidad visual \cite{seeingai}. Por su parte, \textit{Google Lens} combina reconocimiento visual y procesamiento de texto dentro del ecosistema de Google \cite{googlelens}. Estas soluciones muestran el potencial de los dispositivos móviles como plataforma de asistencia, aunque su propósito es general y no coincide necesariamente con el flujo específico de captura, corrección léxica, evaluación experimental y detección de términos asociados a alérgenos desarrollado en Praeco.
+
+Desde el punto de vista de la plataforma, Android proporciona acceso a cámara, almacenamiento y servicios de accesibilidad \cite{android}. Flutter y Dart permiten construir una aplicación móvil multiplataforma a partir de una base de código común \cite{flutter,dart}. En Praeco se ha empleado Google ML Kit para realizar el reconocimiento óptico de caracteres en el dispositivo \cite{mlkit}, junto con síntesis de voz para comunicar los resultados al usuario.
+
+% ------------------------------------------------
+\section{Tecnologías relevantes para Praeco}
+% ------------------------------------------------
+
+\subsection{Reconocimiento óptico de caracteres}
+
+El OCR constituye el núcleo de la extracción textual. En un escenario de etiquetado de productos, la entrada no procede de documentos digitalizados en condiciones controladas, sino de fotografías realizadas con un teléfono móvil. Por ello, la calidad de la captura condiciona directamente el texto obtenido. Praeco incorpora una etapa previa de evaluación de nitidez, brillo y contraste para reducir la probabilidad de procesar imágenes claramente inadecuadas.
+
+\subsection{Corrección léxica posterior al OCR}
+
+La salida del OCR puede contener sustituciones, inserciones, eliminaciones o segmentaciones incorrectas. Praeco aborda este problema mediante un corrector conservador que combina distancia de Levenshtein \cite{levenshtein}, similitud fonética, criterios dependientes de la longitud, reglas de protección y recursos léxicos. El objetivo no es modificar sistemáticamente el texto reconocido, sino intervenir únicamente cuando existe evidencia suficiente para proponer una alternativa más fiable.
+
+El proyecto contempla asimismo recursos de contexto basados en n-gramas. No obstante, aunque dichos recursos se encuentran disponibles en la implementación, la corrección contextual mediante n-gramas no forma parte de la ruta activa utilizada en la evaluación final. Esta distinción es importante para no atribuir a ese mecanismo las mejoras cuantitativas presentadas posteriormente.
+
+\subsection{Procesamiento local y privacidad}
+
+La ejecución en el propio dispositivo reduce la necesidad de transmitir imágenes de etiquetas a servicios externos y disminuye la dependencia de conectividad. Esta característica resulta especialmente relevante en una aplicación asistencial que puede utilizarse en contextos cotidianos y con información capturada directamente por la cámara. La arquitectura final de Praeco está orientada a Android y utiliza componentes locales para las etapas principales de captura, OCR, corrección, detección y síntesis de voz.
+
+% ------------------------------------------------
+\section{Praeco y su aportación}
+% ------------------------------------------------
+
+Praeco se plantea como un prototipo experimental y asistencial centrado en el acceso a información textual presente en etiquetas. A diferencia de una herramienta OCR genérica, integra en un mismo flujo la adquisición de la imagen, su evaluación de calidad, la selección de una región de interés, el reconocimiento mediante ML Kit, el filtrado y reconstrucción del texto, la corrección léxica, la detección de términos asociados a alérgenos y la síntesis de voz.
+
+El corrector protege números, cantidades, palabras cortas, términos previamente validados y otras expresiones que no deben modificarse sin evidencia suficiente. Durante la fase de desarrollo se incorpora además aprendizaje adaptativo a partir de errores observados y validados. Para la evaluación final, estos recursos se congelan, evitando que las muestras de validación modifiquen simultáneamente el conocimiento utilizado por el corrector.
+
+La Tabla~\ref{tab:comparativa_ocr} resume, de forma cualitativa, algunas diferencias entre soluciones de propósito general y el enfoque específico adoptado en Praeco. La comparación pretende contextualizar funcionalidades y no establecer una clasificación de precisión, ya que no se ha realizado un ensayo experimental común entre las aplicaciones.
+
+\begin{table}[htbp]
+    \centering
+    \caption{Comparación cualitativa entre soluciones de asistencia visual y Praeco.}
+    \label{tab:comparativa_ocr}
+    \renewcommand{\arraystretch}{1.25}
+    \begin{tabularx}{\textwidth}{@{}lXXXX@{}}
+        \toprule
+        \textbf{Sistema} & \textbf{OCR} & \textbf{Orientación} & \textbf{Corrección propia evaluada} & \textbf{Alérgenos} \\
+        \midrule
+        Seeing AI \cite{seeingai} & Sí & Asistencia visual general & No evaluada en este TFM & No específica \\
+        Google Lens \cite{googlelens} & Sí & Búsqueda y análisis visual general & No evaluada en este TFM & No específica \\
+        \textbf{Praeco} & \textbf{Sí} & \textbf{Etiquetado y accesibilidad} & \textbf{Sí} & \textbf{Detección de términos} \\
+        \bottomrule
+    \end{tabularx}
+\end{table}
+
+La comparación pone de manifiesto que la aportación principal de Praeco no consiste en competir con plataformas comerciales de visión artificial de propósito general, sino en estudiar de forma reproducible una cadena concreta de procesamiento y evaluar cuantitativamente el efecto de la corrección posterior al OCR. La arquitectura separa además el entorno de desarrollo y aprendizaje, la aplicación destinada al usuario y la herramienta de análisis experimental.
+
+% ------------------------------------------------
+\section{Brecha abordada por el trabajo}
+% ------------------------------------------------
+
+A partir del análisis anterior, el presente TFM aborda una combinación de necesidades: ejecución sobre un dispositivo móvil comercial, control explícito de la calidad de captura, corrección léxica conservadora, aprendizaje adaptativo durante el desarrollo, detección de términos asociados a alérgenos, salida accesible mediante voz y evaluación cuantitativa mediante CER, WER y tiempos de procesamiento.
+
+El interés del trabajo reside, por tanto, tanto en el prototipo funcional como en la metodología experimental utilizada para estudiar sus limitaciones. Los capítulos siguientes describen la arquitectura de Praeco, los mecanismos implementados y la evaluación realizada con los recursos de aprendizaje congelados.
