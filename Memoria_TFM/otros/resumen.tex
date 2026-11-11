@@ -1,0 +1,23 @@
+% ------------------------------------------------
+% RESUMEN
+% ------------------------------------------------
+
+\noindent \begin{center}
+\section*{Resumen}
+\par\end{center}
+
+Las personas con discapacidad visual encuentran dificultades para acceder de forma autónoma a la información textual presente en el etiquetado de productos de uso cotidiano. Este Trabajo Fin de Máster presenta el diseño, desarrollo y evaluación de \textit{Praeco}, un asistente accesible basado en visión artificial, reconocimiento óptico de caracteres y síntesis de voz, implementado para dispositivos móviles Android.
+
+El sistema integra, en un dispositivo móvil, una cadena de procesamiento que comprende la adquisición de imágenes mediante la cámara, la evaluación automática de su calidad a partir de parámetros de nitidez, brillo y contraste, el recorte de la región de interés, el reconocimiento óptico de caracteres mediante Google ML Kit, el filtrado y reconstrucción del texto reconocido, la corrección léxica, la detección de términos asociados a alérgenos y la presentación del resultado mediante síntesis de voz.
+
+Como evolución posterior de la adquisición se ha implementado una captura automática de una sola fotografía, con activación estable de la linterna cuando el brillo es insuficiente y mejora de imagen condicional mediante CLAHE. Estas modificaciones se describen separadamente de la validación principal del corrector.
+
+Para mejorar los errores producidos por el reconocimiento OCR se ha desarrollado un corrector conservador que combina distancia de Levenshtein, similitud fonética, criterios de longitud, mecanismos de protección de palabras y recursos léxicos. El sistema incorpora además un mecanismo de aprendizaje adaptativo que permite obtener conocimiento a partir de los errores observados durante la fase de desarrollo. Una vez finalizado el aprendizaje, los recursos obtenidos se congelan para realizar la validación sin modificar el comportamiento del corrector durante los ensayos.
+
+La arquitectura final se ha organizado en tres aplicaciones complementarias: \textit{Praeco Desarrollo}, utilizada para el desarrollo, aprendizaje y evaluación experimental; \textit{Praeco Usuario}, destinada al funcionamiento normal del asistente con los recursos de aprendizaje previamente obtenidos; y \textit{Praeco Análisis}, desarrollada para el tratamiento y análisis de los resultados experimentales.
+
+La evaluación final se realizó sobre 63 registros con el aprendizaje desactivado. Los resultados muestran una reducción del Character Error Rate (CER) medio de 0,0646 a 0,0621 y del Word Error Rate (WER) medio de 0,1834 a 0,1717 tras aplicar el corrector. La corrección mejoró 15 casos, empeoró 6 y mantuvo sin cambios 42, preservando además los cinco casos en los que el OCR inicial era perfecto. Estos resultados muestran una mejora global moderada y evidencian el carácter conservador del sistema de corrección, aunque también ponen de manifiesto que su efecto depende de las características del error producido por el OCR.
+
+El prototipo desarrollado demuestra la viabilidad de integrar técnicas de visión artificial y procesamiento de texto en dispositivos móviles comerciales para facilitar el acceso autónomo a información textual. Praeco constituye así una solución de bajo coste y una plataforma experimental sobre la que continuar desarrollando mecanismos de reconocimiento, corrección y asistencia accesible.
+
+\textbf{Palabras clave:} discapacidad visual, visión artificial, reconocimiento óptico de caracteres, OCR, Google ML Kit, corrección léxica, aprendizaje adaptativo, accesibilidad, síntesis de voz, Android.

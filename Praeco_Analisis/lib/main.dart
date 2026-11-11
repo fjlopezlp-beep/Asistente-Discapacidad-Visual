@@ -49,7 +49,7 @@ class CsvAnalysis {
   Map<String, dynamic> toJson() {
     return {
       'aplicacion': 'PraecoAnalisis',
-      'version': '2.3.1',
+      'version': '2.4.0',
       'fecha_analisis': generatedAt,
       'archivo_csv': fileName,
       'estructura': {
@@ -741,12 +741,12 @@ class _AnalisisPageState extends State<AnalisisPage> {
                 ),
                 const SizedBox(height: 12),
                 const Text(
-                  'Lee automáticamente el CSV de Praeco 2.3.1, calcula CER, WER, tiempos (incluidos TTS y total cuando están presentes), estadísticas y resume el modo de aprendizaje y la validación OCR. También permite generar un JSON consolidado.',
+                  'Lee automáticamente el CSV de Praeco 2.4.0, calcula CER, WER, tiempos (incluidos TTS y total cuando están presentes), estadísticas y resume el modo de aprendizaje y la validación OCR. También permite generar un JSON consolidado.',
                   textAlign: TextAlign.center,
                 ),
                 const SizedBox(height: 12),
                 const Text(
-                  'Compatible con el esquema Praeco 2.3.1: métricas OCR/corregidas, calidad de imagen, tiempos de captura/OCR/corrección/alérgenos/TTS/total y, cuando existen, modo_aprendizaje y reconocimiento_validado.',
+                  'Compatible con el esquema Praeco 2.4.0: métricas OCR/corregidas, calidad de imagen, tiempos de captura/OCR/corrección/alérgenos/TTS/total y, cuando existen, modo_aprendizaje y reconocimiento_validado.',
                   textAlign: TextAlign.center,
                   style: TextStyle(fontSize: 12),
                 ),
@@ -862,7 +862,7 @@ class _AnalisisPageState extends State<AnalisisPage> {
         const SizedBox(height: 14),
         _timeCard(times),
         const SizedBox(height: 14),
-        _categoricalCard('Modo de aprendizaje (Praeco 2.3.1)', learning),
+        _categoricalCard('Modo de aprendizaje (Praeco 4.0)', learning),
         const SizedBox(height: 14),
         _categoricalCard('Reconocimiento validado', validation),
         const SizedBox(height: 14),

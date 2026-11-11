@@ -44,3 +44,11 @@ Los recursos declarados en cada `pubspec.yaml` se conservan dentro de su corresp
 ## Reproducibilidad
 
 La versión asociada a la entrega del TFM debe identificarse mediante una etiqueta (*tag*) o *release* de GitHub para mantener inmutable el código utilizado en la memoria y en los experimentos finales.
+
+## Versión 2.4.0
+
+La versión 2.4.0 incluye Praeco Desarrollo `2.4.0+2` con captura rápida de una fotografía, análisis previo de calidad, linterna automática (umbral de brillo 150) y preprocesamiento CLAHE condicional (contraste inferior a 25). La compilación y prueba funcional del `main.dart` han sido confirmadas por el autor. El cambio no implica una mejora demostrada de CER/WER.
+
+Praeco Usuario y Praeco Análisis también se han actualizado a `2.4.0+2`. Las tres aplicaciones han sido probadas funcionalmente por el autor. La carpeta `Memoria_TFM/` incluye el PDF y las fuentes LaTeX del trabajo. No se han ejecutado verificaciones automáticas de GitHub Actions para este commit.
+
+Consulta [`CHANGELOG.md`](CHANGELOG.md) para el detalle de cambios.

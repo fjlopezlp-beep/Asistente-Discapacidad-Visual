@@ -1,0 +1,119 @@
+\begin{thebibliography}{20}
+\providecommand{\natexlab}[1]{#1}
+\providecommand{\url}[1]{\texttt{#1}}
+\expandafter\ifx\csname urlstyle\endcsname\relax
+  \providecommand{\doi}[1]{doi: #1}\else
+  \providecommand{\doi}{doi: \begingroup \urlstyle{rm}\Url}\fi
+
+\bibitem[Hersh and Johnson(2008)]{assistive}
+M.~Hersh and M.~Johnson.
+\newblock \emph{Assistive Technology for Visually Impaired and Blind People}.
+\newblock Springer, 2008.
+
+\bibitem[Gonzalez and Woods(2018)]{gonzalez}
+R.~C. Gonzalez and R.~E. Woods.
+\newblock \emph{Digital Image Processing}.
+\newblock Pearson Education, 4ª edition, 2018.
+
+\bibitem[Szeliski(2011)]{mobilevision}
+R.~Szeliski.
+\newblock \emph{Computer Vision: Algorithms and Applications}.
+\newblock Springer, 2011.
+
+\bibitem[Smith(2007)]{ocr}
+R.~Smith.
+\newblock An overview of the tesseract ocr engine.
+\newblock In \emph{Proceedings of ICDAR}, 2007.
+
+\bibitem[Levenshtein(1966)]{levenshtein}
+V.~I. Levenshtein.
+\newblock Binary codes capable of correcting deletions, insertions and
+  reversals.
+\newblock \emph{Soviet Physics Doklady}, 1966.
+
+\bibitem[Jurafsky and Martin(2023)]{nlp}
+D.~Jurafsky and J.~Martin.
+\newblock \emph{Speech and Language Processing}.
+\newblock Prentice Hall, 3ª edition, 2023.
+
+\bibitem[Microsoft(2026)]{seeingai}
+Microsoft.
+\newblock Seeing ai.
+\newblock \url{https://www.microsoft.com/en-us/ai/seeing-ai}, 2026.
+\newblock Consultado en mayo de 2026.
+
+\bibitem[Google(2026{\natexlab{a}})]{googlelens}
+Google.
+\newblock Google lens.
+\newblock \url{https://lens.google}, 2026{\natexlab{a}}.
+\newblock Consultado en mayo de 2026.
+
+\bibitem[Google(2026{\natexlab{b}})]{android}
+Google.
+\newblock Android developers documentation.
+\newblock \url{https://developer.android.com}, 2026{\natexlab{b}}.
+\newblock Consultado en mayo de 2026.
+
+\bibitem[Google(2026{\natexlab{c}})]{flutter}
+Google.
+\newblock Flutter documentation.
+\newblock \url{https://flutter.dev}, 2026{\natexlab{c}}.
+\newblock Consultado en mayo de 2026.
+
+\bibitem[Google(2026{\natexlab{d}})]{dart}
+Google.
+\newblock Dart programming language.
+\newblock \url{https://dart.dev}, 2026{\natexlab{d}}.
+\newblock Consultado en mayo de 2026.
+
+\bibitem[Google(2026{\natexlab{e}})]{mlkit}
+Google.
+\newblock Google ml kit documentation.
+\newblock \url{https://developers.google.com/ml-kit}, 2026{\natexlab{e}}.
+\newblock Consultado en mayo de 2026.
+
+\bibitem[{Flutter Community}(2026{\natexlab{a}})]{tts}
+{Flutter Community}.
+\newblock Flutter tts package.
+\newblock \url{https://pub.dev/packages/flutter_tts}, 2026{\natexlab{a}}.
+\newblock Consultado en mayo de 2026.
+
+\bibitem[{Flutter Community}(2026{\natexlab{b}})]{camera}
+{Flutter Community}.
+\newblock Camera package for flutter.
+\newblock \url{https://pub.dev/packages/camera}, 2026{\natexlab{b}}.
+\newblock Consultado en mayo de 2026.
+
+\bibitem[Russell and Norvig(2021)]{russell}
+S.~Russell and P.~Norvig.
+\newblock \emph{Artificial Intelligence: A Modern Approach}.
+\newblock Pearson, 4ª edition, 2021.
+
+\bibitem[Bishop(2006)]{bishop}
+C.~Bishop.
+\newblock \emph{Pattern Recognition and Machine Learning}.
+\newblock Springer, 2006.
+
+\bibitem[W3C(2026)]{accessibility}
+W3C.
+\newblock Web content accessibility guidelines (wcag).
+\newblock \url{https://www.w3.org/WAI/standards-guidelines/wcag/}, 2026.
+\newblock Consultado en mayo de 2026.
+
+\bibitem[OpenAI(2026)]{openai}
+OpenAI.
+\newblock Openai api documentation.
+\newblock \url{https://platform.openai.com/docs}, 2026.
+\newblock Consultado en mayo de 2026.
+
+\bibitem[Bradski(2000)]{opencv}
+G.~Bradski.
+\newblock The opencv library.
+\newblock \emph{Dr. Dobb's Journal of Software Tools}, 2000.
+
+\bibitem[Loitsch(2024)]{async}
+F.~Loitsch.
+\newblock Asynchronous programming in dart.
+\newblock Google Developers Documentation, 2024.
+
+\end{thebibliography}
